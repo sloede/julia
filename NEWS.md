@@ -87,6 +87,10 @@ Compiler/Runtime improvements
   interoperability with C or other languages) might need to be updated; for
   example any object that needs a stable address should be a `mutable struct`.
 
+* All platforms can now use `@executable_path` within `jl_load_dynamic_library()`.
+  This allows executable-relative paths to be embedded within executables on all
+  platforms, not just MacOS, which the syntax is borrowed from. ([#35627])
+
 Command-line option changes
 ---------------------------
 
