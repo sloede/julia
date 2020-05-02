@@ -445,6 +445,9 @@ function Symbol(a::Array{UInt8,1})
 end
 Symbol(s::Symbol) = s
 
+# For compatibility
+_apply_latest(@nospecialize args...) = _apply_in_world(typemax_UInt, args...)
+
 # module providing the IR object model
 module IR
 export CodeInfo, MethodInstance, CodeInstance, GotoNode,
