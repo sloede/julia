@@ -1,11 +1,11 @@
 // This file is a part of Julia. License is MIT: https://julialang.org/license
 
-#include <limits.h>
-#include <assert.h>
-#include <stdint.h>
-#include <stddef.h>
 #include "dtypes.h"
 #include "utils.h"
+#include <assert.h>
+#include <limits.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,46 +13,46 @@ extern "C" {
 
 double conv_to_double(void *data, numerictype_t tag)
 {
-    double d=0;
+    double d = 0;
     switch (tag) {
-    case T_INT8:   d = (double)*(int8_t*)data; break;
-    case T_UINT8:  d = (double)*(uint8_t*)data; break;
-    case T_INT16:  d = (double)*(int16_t*)data; break;
-    case T_UINT16: d = (double)*(uint16_t*)data; break;
-    case T_INT32:  d = (double)*(int32_t*)data; break;
-    case T_UINT32: d = (double)*(uint32_t*)data; break;
+    case T_INT8: d = (double)*(int8_t *)data; break;
+    case T_UINT8: d = (double)*(uint8_t *)data; break;
+    case T_INT16: d = (double)*(int16_t *)data; break;
+    case T_UINT16: d = (double)*(uint16_t *)data; break;
+    case T_INT32: d = (double)*(int32_t *)data; break;
+    case T_UINT32: d = (double)*(uint32_t *)data; break;
     case T_INT64: {
         int64_t l = (int64_t)jl_load_ptraligned_i64(data);
         d = (double)l;
-        if (d > 0 && l < 0)  // can happen!
+        if (d > 0 && l < 0) // can happen!
             d = -d;
         break;
     }
     case T_UINT64: d = (double)jl_load_ptraligned_i64(data); break;
-    case T_FLOAT:  d = (double)*(float*)data; break;
+    case T_FLOAT: d = (double)*(float *)data; break;
     case T_DOUBLE: return jl_load_ptraligned_f64(data);
     }
     return d;
 }
 
-#define CONV_TO_INTTYPE(type)                                                  \
-type##_t conv_to_##type(void *data, numerictype_t tag)                         \
-{                                                                              \
-    type##_t i=0;                                                              \
-    switch (tag) {                                                             \
-    case T_INT8:   i = (type##_t)*(int8_t*)data; break;                        \
-    case T_UINT8:  i = (type##_t)*(uint8_t*)data; break;                       \
-    case T_INT16:  i = (type##_t)*(int16_t*)(data); break;                     \
-    case T_UINT16: i = (type##_t)*(uint16_t*)(data); break;                    \
-    case T_INT32:  i = (type##_t)*(int32_t*)(data); break;                     \
-    case T_UINT32: i = (type##_t)*(uint32_t*)(data); break;                    \
-    case T_INT64:  i = (type##_t)(int64_t)jl_load_ptraligned_i64(data); break; \
-    case T_UINT64: i = (type##_t)jl_load_ptraligned_i64(data); break;          \
-    case T_FLOAT:  i = (type##_t)*(float*)data; break;                         \
-    case T_DOUBLE: i = (type##_t)jl_load_ptraligned_f64(data); break;          \
-    }                                                                          \
-    return i;                                                                  \
-}
+#define CONV_TO_INTTYPE(type)                                                     \
+    type##_t conv_to_##type(void *data, numerictype_t tag)                        \
+    {                                                                             \
+        type##_t i = 0;                                                           \
+        switch (tag) {                                                            \
+        case T_INT8: i = (type##_t) * (int8_t *)data; break;                      \
+        case T_UINT8: i = (type##_t) * (uint8_t *)data; break;                    \
+        case T_INT16: i = (type##_t) * (int16_t *)(data); break;                  \
+        case T_UINT16: i = (type##_t) * (uint16_t *)(data); break;                \
+        case T_INT32: i = (type##_t) * (int32_t *)(data); break;                  \
+        case T_UINT32: i = (type##_t) * (uint32_t *)(data); break;                \
+        case T_INT64: i = (type##_t)(int64_t)jl_load_ptraligned_i64(data); break; \
+        case T_UINT64: i = (type##_t)jl_load_ptraligned_i64(data); break;         \
+        case T_FLOAT: i = (type##_t) * (float *)data; break;                      \
+        case T_DOUBLE: i = (type##_t)jl_load_ptraligned_f64(data); break;         \
+        }                                                                         \
+        return i;                                                                 \
+    }
 
 CONV_TO_INTTYPE(int64)
 CONV_TO_INTTYPE(int32)
@@ -63,21 +63,21 @@ CONV_TO_INTTYPE(uint32)
 // to cast to int64 first.
 uint64_t conv_to_uint64(void *data, numerictype_t tag)
 {
-    uint64_t i=0;
+    uint64_t i = 0;
     switch (tag) {
-    case T_INT8:   i = (uint64_t)*(int8_t*)data; break;
-    case T_UINT8:  i = (uint64_t)*(uint8_t*)data; break;
-    case T_INT16:  i = (uint64_t)*(int16_t*)data; break;
-    case T_UINT16: i = (uint64_t)*(uint16_t*)data; break;
-    case T_INT32:  i = (uint64_t)*(int32_t*)data; break;
-    case T_UINT32: i = (uint64_t)*(uint32_t*)data; break;
-    case T_INT64:  i = (uint64_t)jl_load_ptraligned_i64(data); break;
+    case T_INT8: i = (uint64_t) * (int8_t *)data; break;
+    case T_UINT8: i = (uint64_t) * (uint8_t *)data; break;
+    case T_INT16: i = (uint64_t) * (int16_t *)data; break;
+    case T_UINT16: i = (uint64_t) * (uint16_t *)data; break;
+    case T_INT32: i = (uint64_t) * (int32_t *)data; break;
+    case T_UINT32: i = (uint64_t) * (uint32_t *)data; break;
+    case T_INT64: i = (uint64_t)jl_load_ptraligned_i64(data); break;
     case T_UINT64: i = (uint64_t)jl_load_ptraligned_i64(data); break;
     case T_FLOAT:
-        if (*(float*)data >= 0)
-            i = (uint64_t)*(float*)data;
+        if (*(float *)data >= 0)
+            i = (uint64_t) * (float *)data;
         else
-            i = (uint64_t)(int64_t)*(float*)data;
+            i = (uint64_t)(int64_t) * (float *)data;
         break;
     case T_DOUBLE:
         if (jl_load_ptraligned_f64(data) >= 0)
@@ -92,15 +92,16 @@ uint64_t conv_to_uint64(void *data, numerictype_t tag)
 int cmp_same_lt(void *a, void *b, numerictype_t tag)
 {
     switch (tag) {
-    case T_INT8:   return *(int8_t*)a < *(int8_t*)b;
-    case T_UINT8:  return *(uint8_t*)a < *(uint8_t*)b;
-    case T_INT16:  return *(int16_t*)a < *(int16_t*)b;
-    case T_UINT16: return *(uint16_t*)a < *(uint16_t*)b;
-    case T_INT32:  return *(int32_t*)a < *(int32_t*)b;
-    case T_UINT32: return *(uint32_t*)a < *(uint32_t*)b;
-    case T_INT64:  return (int64_t)jl_load_ptraligned_i64(a) < (int64_t)jl_load_ptraligned_i64(b);
+    case T_INT8: return *(int8_t *)a < *(int8_t *)b;
+    case T_UINT8: return *(uint8_t *)a < *(uint8_t *)b;
+    case T_INT16: return *(int16_t *)a < *(int16_t *)b;
+    case T_UINT16: return *(uint16_t *)a < *(uint16_t *)b;
+    case T_INT32: return *(int32_t *)a < *(int32_t *)b;
+    case T_UINT32: return *(uint32_t *)a < *(uint32_t *)b;
+    case T_INT64:
+        return (int64_t)jl_load_ptraligned_i64(a) < (int64_t)jl_load_ptraligned_i64(b);
     case T_UINT64: return jl_load_ptraligned_i64(a) < jl_load_ptraligned_i64(b);
-    case T_FLOAT:  return *(float*)a < *(float*)b;
+    case T_FLOAT: return *(float *)a < *(float *)b;
     case T_DOUBLE: return jl_load_ptraligned_f64(a) < jl_load_ptraligned_f64(b);
     }
     return 0;
@@ -109,15 +110,15 @@ int cmp_same_lt(void *a, void *b, numerictype_t tag)
 int cmp_same_eq(void *a, void *b, numerictype_t tag)
 {
     switch (tag) {
-    case T_INT8:   return *(int8_t*)a == *(int8_t*)b;
-    case T_UINT8:  return *(uint8_t*)a == *(uint8_t*)b;
-    case T_INT16:  return *(int16_t*)a == *(int16_t*)b;
-    case T_UINT16: return *(uint16_t*)a == *(uint16_t*)b;
-    case T_INT32:  return *(int32_t*)a == *(int32_t*)b;
-    case T_UINT32: return *(uint32_t*)a == *(uint32_t*)b;
-    case T_INT64:  return jl_load_ptraligned_i64(a) == jl_load_ptraligned_i64(b);
+    case T_INT8: return *(int8_t *)a == *(int8_t *)b;
+    case T_UINT8: return *(uint8_t *)a == *(uint8_t *)b;
+    case T_INT16: return *(int16_t *)a == *(int16_t *)b;
+    case T_UINT16: return *(uint16_t *)a == *(uint16_t *)b;
+    case T_INT32: return *(int32_t *)a == *(int32_t *)b;
+    case T_UINT32: return *(uint32_t *)a == *(uint32_t *)b;
+    case T_INT64: return jl_load_ptraligned_i64(a) == jl_load_ptraligned_i64(b);
     case T_UINT64: return jl_load_ptraligned_i64(a) == jl_load_ptraligned_i64(b);
-    case T_FLOAT:  return *(float*)a == *(float*)b;
+    case T_FLOAT: return *(float *)a == *(float *)b;
     case T_DOUBLE: return jl_load_ptraligned_f64(a) == jl_load_ptraligned_f64(b);
     }
     return 0;
@@ -125,7 +126,7 @@ int cmp_same_eq(void *a, void *b, numerictype_t tag)
 
 int cmp_lt(void *a, numerictype_t atag, void *b, numerictype_t btag)
 {
-    if (atag==btag)
+    if (atag == btag)
         return cmp_same_lt(a, b, atag);
 
     double da = conv_to_double(a, atag);
@@ -147,7 +148,8 @@ int cmp_lt(void *a, numerictype_t atag, void *b, numerictype_t btag)
                     (int64_t)jl_load_ptraligned_i64(b));
         }
         else if (btag == T_DOUBLE) {
-            if (db != db) return 0;
+            if (db != db)
+                return 0;
             return (jl_load_ptraligned_i64(a) < (uint64_t)jl_load_ptraligned_f64(b));
         }
     }
@@ -160,30 +162,37 @@ int cmp_lt(void *a, numerictype_t atag, void *b, numerictype_t btag)
                     (int64_t)jl_load_ptraligned_i64(b));
         }
         else if (btag == T_DOUBLE) {
-            if (db != db) return 0;
-            return ((int64_t)jl_load_ptraligned_i64(a) < (int64_t)jl_load_ptraligned_f64(b));
+            if (db != db)
+                return 0;
+            return ((int64_t)jl_load_ptraligned_i64(a) <
+                    (int64_t)jl_load_ptraligned_f64(b));
         }
     }
     if (btag == T_UINT64) {
         if (atag == T_DOUBLE) {
-            if (da != da) return 0;
+            if (da != da)
+                return 0;
             return (jl_load_ptraligned_i64(b) > (uint64_t)jl_load_ptraligned_f64(a));
         }
     }
     else if (btag == T_INT64) {
         if (atag == T_DOUBLE) {
-            if (da != da) return 0;
-            return ((int64_t)jl_load_ptraligned_i64(b) > (int64_t)jl_load_ptraligned_f64(a));
+            if (da != da)
+                return 0;
+            return ((int64_t)jl_load_ptraligned_i64(b) >
+                    (int64_t)jl_load_ptraligned_f64(a));
         }
     }
     return 0;
 }
 
-int cmp_eq(void *a, numerictype_t atag, void *b, numerictype_t btag,
-           int equalnans)
+int cmp_eq(void *a, numerictype_t atag, void *b, numerictype_t btag, int equalnans)
 {
-    union { double d; int64_t i64; } u, v;
-    if (atag==btag && (!equalnans || atag < T_FLOAT))
+    union {
+        double d;
+        int64_t i64;
+    } u, v;
+    if (atag == btag && (!equalnans || atag < T_FLOAT))
         return cmp_same_eq(a, b, atag);
 
     double da = conv_to_double(a, atag);
@@ -191,7 +200,8 @@ int cmp_eq(void *a, numerictype_t atag, void *b, numerictype_t btag,
 
     if ((int)atag >= T_FLOAT && (int)btag >= T_FLOAT) {
         if (equalnans) {
-            u.d = da; v.d = db;
+            u.d = da;
+            v.d = db;
             return u.i64 == v.i64;
         }
         return (da == db);
@@ -207,7 +217,8 @@ int cmp_eq(void *a, numerictype_t atag, void *b, numerictype_t btag,
             return (jl_load_ptraligned_i64(a) == jl_load_ptraligned_i64(b));
         }
         else if (btag == T_DOUBLE) {
-            return (jl_load_ptraligned_i64(a) == (uint64_t)(int64_t)jl_load_ptraligned_f64(b));
+            return (jl_load_ptraligned_i64(a) ==
+                    (uint64_t)(int64_t)jl_load_ptraligned_f64(b));
         }
     }
     else if (atag == T_INT64) {
@@ -215,19 +226,22 @@ int cmp_eq(void *a, numerictype_t atag, void *b, numerictype_t btag,
             return (jl_load_ptraligned_i64(a) == jl_load_ptraligned_i64(b));
         }
         else if (btag == T_DOUBLE) {
-            return ((int64_t)jl_load_ptraligned_i64(a) == (int64_t)jl_load_ptraligned_f64(b));
+            return ((int64_t)jl_load_ptraligned_i64(a) ==
+                    (int64_t)jl_load_ptraligned_f64(b));
         }
     }
     else if (btag == T_UINT64) {
         assert(atag != T_INT64); // Taken care of above
         if (atag == T_DOUBLE) {
-            return (jl_load_ptraligned_i64(b) == (uint64_t)(int64_t)jl_load_ptraligned_f64(a));
+            return (jl_load_ptraligned_i64(b) ==
+                    (uint64_t)(int64_t)jl_load_ptraligned_f64(a));
         }
     }
     else if (btag == T_INT64) {
         assert(atag != T_UINT64); // Taken care of above
         if (atag == T_DOUBLE) {
-            return ((int64_t)jl_load_ptraligned_i64(b) == (int64_t)jl_load_ptraligned_f64(a));
+            return ((int64_t)jl_load_ptraligned_i64(b) ==
+                    (int64_t)jl_load_ptraligned_f64(a));
         }
     }
     return 1;

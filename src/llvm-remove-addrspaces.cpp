@@ -2,12 +2,12 @@
 
 #include "llvm-version.h"
 
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/InstIterator.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/InstIterator.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ValueMapper.h>
@@ -30,8 +30,7 @@ class AddrspaceRemoveTypeRemapper : public ValueMapTypeRemapper {
     AddrspaceRemapFunction ASRemapper;
 
 public:
-    AddrspaceRemoveTypeRemapper(AddrspaceRemapFunction ASRemapper)
-        : ASRemapper(ASRemapper)
+    AddrspaceRemoveTypeRemapper(AddrspaceRemapFunction ASRemapper) : ASRemapper(ASRemapper)
     {
     }
 
@@ -44,15 +43,14 @@ public:
 
         DstTy = SrcTy;
         if (auto Ty = dyn_cast<PointerType>(SrcTy))
-            DstTy = PointerType::get(
-                    remapType(Ty->getElementType()),
-                    ASRemapper(Ty->getAddressSpace()));
+            DstTy = PointerType::get(remapType(Ty->getElementType()),
+                                     ASRemapper(Ty->getAddressSpace()));
         else if (auto Ty = dyn_cast<FunctionType>(SrcTy)) {
             SmallVector<Type *, 4> Params;
             for (unsigned Index = 0; Index < Ty->getNumParams(); ++Index)
                 Params.push_back(remapType(Ty->getParamType(Index)));
-            DstTy = FunctionType::get(
-                    remapType(Ty->getReturnType()), Params, Ty->isVarArg());
+            DstTy =
+                FunctionType::get(remapType(Ty->getReturnType()), Params, Ty->isVarArg());
         }
         else if (auto Ty = dyn_cast<StructType>(SrcTy)) {
             if (!Ty->isOpaque()) {
@@ -63,28 +61,23 @@ public:
                 if (Ty->hasName()) {
                     auto Name = std::string(Ty->getName());
                     Ty->setName(Name + ".bad");
-                    DstTy = StructType::create(
-                            Ty->getContext(), NewElTys, Name, Ty->isPacked());
+                    DstTy = StructType::create(Ty->getContext(), NewElTys, Name,
+                                               Ty->isPacked());
                 }
                 else
-                    DstTy = StructType::get(
-                            Ty->getContext(), NewElTys, Ty->isPacked());
+                    DstTy = StructType::get(Ty->getContext(), NewElTys, Ty->isPacked());
             }
         }
         else if (auto Ty = dyn_cast<ArrayType>(SrcTy))
-            DstTy = ArrayType::get(
-                    remapType(Ty->getElementType()), Ty->getNumElements());
+            DstTy = ArrayType::get(remapType(Ty->getElementType()), Ty->getNumElements());
         else if (auto Ty = dyn_cast<VectorType>(SrcTy))
-            DstTy = VectorType::get(
-                    remapType(Ty->getElementType()),
-                    Ty->getNumElements(),
-                    Ty->isScalable());
+            DstTy = VectorType::get(remapType(Ty->getElementType()), Ty->getNumElements(),
+                                    Ty->isScalable());
 
         if (DstTy != SrcTy)
-            LLVM_DEBUG(
-                    dbgs() << "Remapping type:\n"
-                           << "  from " << *SrcTy << "\n"
-                           << "  to   " << *DstTy << "\n");
+            LLVM_DEBUG(dbgs() << "Remapping type:\n"
+                              << "  from " << *SrcTy << "\n"
+                              << "  to   " << *DstTy << "\n");
 
         MappedTypes[SrcTy] = DstTy;
         return DstTy;
@@ -102,11 +95,9 @@ class AddrspaceRemoveValueMaterializer : public ValueMaterializer {
     ValueMapTypeRemapper *TypeMapper = nullptr;
 
 public:
-    AddrspaceRemoveValueMaterializer(
-            ValueToValueMapTy &VM,
-            RemapFlags Flags = RF_None,
-            ValueMapTypeRemapper *TypeMapper = nullptr)
-        : VM(VM), Flags(Flags), TypeMapper(TypeMapper)
+    AddrspaceRemoveValueMaterializer(ValueToValueMapTy &VM, RemapFlags Flags = RF_None,
+                                     ValueMapTypeRemapper *TypeMapper = nullptr)
+      : VM(VM), Flags(Flags), TypeMapper(TypeMapper)
     {
     }
 
@@ -126,8 +117,7 @@ public:
             else {
                 // recreate other const exprs with their operands remapped
                 SmallVector<Constant *, 4> Ops;
-                for (unsigned Index = 0; Index < CE->getNumOperands();
-                     ++Index) {
+                for (unsigned Index = 0; Index < CE->getNumOperands(); ++Index) {
                     Constant *Op = CE->getOperand(Index);
                     Constant *NewOp = mapConstant(Op);
                     Ops.push_back(NewOp ? cast<Constant>(NewOp) : Op);
@@ -137,9 +127,9 @@ public:
                     // GEP const exprs need to know the type of the source.
                     // asserts remapType(typeof arg0) == typeof mapValue(arg0).
                     Constant *Src = CE->getOperand(0);
-                    Type *SrcTy = remapType(
-                            cast<PointerType>(Src->getType()->getScalarType())
-                                    ->getElementType());
+                    Type *SrcTy =
+                        remapType(cast<PointerType>(Src->getType()->getScalarType())
+                                      ->getElementType());
                     DstV = CE->getWithOperands(Ops, Ty, false, SrcTy);
                 }
                 else
@@ -148,10 +138,9 @@ public:
         }
 
         if (DstV)
-            LLVM_DEBUG(
-                    dbgs() << "Materializing value:\n"
-                           << "  from " << *SrcV << "\n"
-                           << "  to   " << *DstV << "\n");
+            LLVM_DEBUG(dbgs() << "Materializing value:\n"
+                              << "  from " << *SrcV << "\n"
+                              << "  to   " << *DstV << "\n");
         return DstV;
     }
 
@@ -164,15 +153,9 @@ private:
             return SrcTy;
     }
 
-    Value *mapValue(Value *V)
-    {
-        return MapValue(V, VM, Flags, TypeMapper, this);
-    }
+    Value *mapValue(Value *V) { return MapValue(V, VM, Flags, TypeMapper, this); }
 
-    Constant *mapConstant(Constant *V)
-    {
-        return MapValue(V, VM, Flags, TypeMapper, this);
-    }
+    Constant *mapConstant(Constant *V) { return MapValue(V, VM, Flags, TypeMapper, this); }
 };
 
 bool RemoveNoopAddrSpaceCasts(Function *F)
@@ -183,9 +166,7 @@ bool RemoveNoopAddrSpaceCasts(Function *F)
     for (Instruction &I : instructions(F)) {
         if (auto *ASC = dyn_cast<AddrSpaceCastInst>(&I)) {
             if (ASC->getSrcAddressSpace() == ASC->getDestAddressSpace()) {
-                LLVM_DEBUG(
-                        dbgs() << "Removing noop address space cast:\n"
-                               << I << "\n");
+                LLVM_DEBUG(dbgs() << "Removing noop address space cast:\n" << I << "\n");
                 ASC->replaceAllUsesWith(ASC->getOperand(0));
                 NoopCasts.push_back(ASC);
             }
@@ -220,9 +201,8 @@ unsigned removeAllAddrspaces(unsigned AS)
 struct RemoveAddrspacesPass : public ModulePass {
     static char ID;
     AddrspaceRemapFunction ASRemapper;
-    RemoveAddrspacesPass(
-            AddrspaceRemapFunction ASRemapper = removeAllAddrspaces)
-        : ModulePass(ID), ASRemapper(ASRemapper){};
+    RemoveAddrspacesPass(AddrspaceRemapFunction ASRemapper = removeAllAddrspaces)
+      : ModulePass(ID), ASRemapper(ASRemapper){};
 
 public:
     bool runOnModule(Module &M) override;
@@ -232,8 +212,7 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
 {
     ValueToValueMapTy VMap;
     AddrspaceRemoveTypeRemapper TypeRemapper(ASRemapper);
-    AddrspaceRemoveValueMaterializer Materializer(
-            VMap, RF_None, &TypeRemapper);
+    AddrspaceRemoveValueMaterializer Materializer(VMap, RF_None, &TypeRemapper);
 
     // Loop over all of the global variables, creating versions without address
     // spaces. We only add the new globals to the VMap, attributes and
@@ -250,16 +229,11 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
         else
             Name = "";
 
-        GlobalVariable *NGV = new GlobalVariable(
-                M,
-                TypeRemapper.remapType(GV->getValueType()),
-                GV->isConstant(),
-                GV->getLinkage(),
-                (Constant *)nullptr,
-                Name,
-                (GlobalVariable *)nullptr,
-                GV->getThreadLocalMode(),
-                GV->getType()->getAddressSpace());
+        GlobalVariable *NGV =
+            new GlobalVariable(M, TypeRemapper.remapType(GV->getValueType()),
+                               GV->isConstant(), GV->getLinkage(), (Constant *)nullptr,
+                               Name, (GlobalVariable *)nullptr, GV->getThreadLocalMode(),
+                               GV->getType()->getAddressSpace());
         NGV->copyAttributesFrom(GV);
         VMap[GV] = NGV;
     }
@@ -277,12 +251,9 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
         else
             Name = "";
 
-        auto *NGA = GlobalAlias::create(
-                TypeRemapper.remapType(GA->getValueType()),
-                GA->getType()->getPointerAddressSpace(),
-                GA->getLinkage(),
-                Name,
-                &M);
+        auto *NGA = GlobalAlias::create(TypeRemapper.remapType(GA->getValueType()),
+                                        GA->getType()->getPointerAddressSpace(),
+                                        GA->getLinkage(), Name, &M);
         NGA->copyAttributesFrom(GA);
         VMap[GA] = NGA;
     }
@@ -304,13 +275,11 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
         SmallVector<Type *, 3> Tys;
         for (Type *Ty : FTy->params())
             Tys.push_back(TypeRemapper.remapType(Ty));
-        FunctionType *NFTy = FunctionType::get(
-                TypeRemapper.remapType(FTy->getReturnType()),
-                Tys,
-                FTy->isVarArg());
+        FunctionType *NFTy = FunctionType::get(TypeRemapper.remapType(FTy->getReturnType()),
+                                               Tys, FTy->isVarArg());
 
-        Function *NF = Function::Create(
-                NFTy, F->getLinkage(), F->getAddressSpace(), Name, &M);
+        Function *NF =
+            Function::Create(NFTy, F->getLinkage(), F->getAddressSpace(), Name, &M);
         NF->copyAttributesFrom(F);
         VMap[F] = NF;
     }
@@ -329,9 +298,7 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
         SmallVector<std::pair<unsigned, MDNode *>, 1> MDs;
         GV->getAllMetadata(MDs);
         for (auto MD : MDs)
-            NGV->addMetadata(
-                    MD.first,
-                    *MapMetadata(MD.second, VMap, RF_MoveDistinctMDs));
+            NGV->addMetadata(MD.first, *MapMetadata(MD.second, VMap, RF_MoveDistinctMDs));
 
         copyComdat(NGV, GV);
 
@@ -347,23 +314,15 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
         LLVM_DEBUG(dbgs() << "Processing function " << NF->getName() << "\n");
 
         Function::arg_iterator DestI = NF->arg_begin();
-        for (Function::const_arg_iterator I = F->arg_begin(); I != F->arg_end();
-             ++I) {
+        for (Function::const_arg_iterator I = F->arg_begin(); I != F->arg_end(); ++I) {
             DestI->setName(I->getName());
             VMap[&*I] = &*DestI++;
         }
 
         SmallVector<ReturnInst *, 8> Returns; // Ignore returns cloned.
-        CloneFunctionInto(
-                NF,
-                F,
-                VMap,
-                /*ModuleLevelChanges=*/true,
-                Returns,
-                "",
-                nullptr,
-                &TypeRemapper,
-                &Materializer);
+        CloneFunctionInto(NF, F, VMap,
+                          /*ModuleLevelChanges=*/true, Returns, "", nullptr, &TypeRemapper,
+                          &Materializer);
 
         if (F->hasPersonalityFn())
             NF->setPersonalityFn(MapValue(F->getPersonalityFn(), VMap));
@@ -411,13 +370,9 @@ bool RemoveAddrspacesPass::runOnModule(Module &M)
 
 char RemoveAddrspacesPass::ID = 0;
 static RegisterPass<RemoveAddrspacesPass>
-        X("RemoveAddrspaces",
-          "Remove IR address space information.",
-          false,
-          false);
+    X("RemoveAddrspaces", "Remove IR address space information.", false, false);
 
-Pass *createRemoveAddrspacesPass(
-        AddrspaceRemapFunction ASRemapper = removeAllAddrspaces)
+Pass *createRemoveAddrspacesPass(AddrspaceRemapFunction ASRemapper = removeAllAddrspaces)
 {
     return new RemoveAddrspacesPass(ASRemapper);
 }
@@ -445,10 +400,7 @@ struct RemoveJuliaAddrspacesPass : public ModulePass {
 
 char RemoveJuliaAddrspacesPass::ID = 0;
 static RegisterPass<RemoveJuliaAddrspacesPass>
-        Y("RemoveJuliaAddrspaces",
-          "Remove IR address space information.",
-          false,
-          false);
+    Y("RemoveJuliaAddrspaces", "Remove IR address space information.", false, false);
 
 Pass *createRemoveJuliaAddrspacesPass()
 {

@@ -2,15 +2,15 @@
   Extra femtoLisp builtin functions
 */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdarg.h>
 #include <assert.h>
 #include <ctype.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "flisp.h"
 
@@ -36,18 +36,19 @@ static value_t fl_nconc(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     if (nargs == 0)
         return fl_ctx->NIL;
-    value_t lst, first=fl_ctx->NIL;
+    value_t lst, first = fl_ctx->NIL;
     value_t *pcdr = &first;
     cons_t *c;
-    uint32_t i=0;
+    uint32_t i = 0;
     while (1) {
         lst = args[i++];
-        if (i >= nargs) break;
+        if (i >= nargs)
+            break;
         if (iscons(lst)) {
             *pcdr = lst;
-            c = (cons_t*)ptr(lst);
+            c = (cons_t *)ptr(lst);
             while (iscons(c->cdr))
-                c = (cons_t*)ptr(c->cdr);
+                c = (cons_t *)ptr(c->cdr);
             pcdr = &c->cdr;
         }
         else if (lst != fl_ctx->NIL) {
@@ -78,7 +79,7 @@ static value_t fl_memq(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "memq", nargs, 2);
     while (iscons(args[1])) {
-        cons_t *c = (cons_t*)ptr(args[1]);
+        cons_t *c = (cons_t *)ptr(args[1]);
         if (c->car == args[0])
             return args[1];
         args[1] = c->cdr;
@@ -95,14 +96,14 @@ static value_t fl_length(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
         return fixnum(vector_size(a));
     }
     else if (iscprim(a)) {
-        cv = (cvalue_t*)ptr(a);
+        cv = (cvalue_t *)ptr(a);
         if (cp_class(cv) == fl_ctx->bytetype)
             return fixnum(1);
         else if (cp_class(cv) == fl_ctx->wchartype)
-            return fixnum(u8_charlen(*(uint32_t*)cp_data((cprim_t*)cv)));
+            return fixnum(u8_charlen(*(uint32_t *)cp_data((cprim_t *)cv)));
     }
     else if (iscvalue(a)) {
-        cv = (cvalue_t*)ptr(a);
+        cv = (cvalue_t *)ptr(a);
         if (cv_class(cv)->eltype != NULL)
             return size_wrap(fl_ctx, cvalue_arraylen(a));
     }
@@ -134,14 +135,14 @@ static value_t fl_symbol(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     argcount(fl_ctx, "symbol", nargs, 1);
     if (!fl_isstring(fl_ctx, args[0]))
         type_error(fl_ctx, "symbol", "string", args[0]);
-    return symbol(fl_ctx, (char*)cvalue_data(args[0]));
+    return symbol(fl_ctx, (char *)cvalue_data(args[0]));
 }
 
 static value_t fl_keywordp(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "keyword?", nargs, 1);
-    return (issymbol(args[0]) &&
-            iskeyword((symbol_t*)ptr(args[0]))) ? fl_ctx->T : fl_ctx->F;
+    return (issymbol(args[0]) && iskeyword((symbol_t *)ptr(args[0]))) ? fl_ctx->T :
+                                                                        fl_ctx->F;
 }
 
 static value_t fl_top_level_value(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
@@ -166,7 +167,7 @@ static void global_env_list(fl_context_t *fl_ctx, symbol_t *root, value_t *pv)
 {
     while (root != NULL) {
         if (root->name[0] != ':' && (root->binding != UNBOUND)) {
-            *pv = fl_cons(fl_ctx, tagptr(root,TAG_SYM), *pv);
+            *pv = fl_cons(fl_ctx, tagptr(root, TAG_SYM), *pv);
         }
         global_env_list(fl_ctx, root->left, pv);
         root = root->right;
@@ -188,7 +189,7 @@ static value_t fl_constantp(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "constant?", nargs, 1);
     if (issymbol(args[0]))
-        return (isconstant((symbol_t*)ptr(args[0])) ? fl_ctx->T : fl_ctx->F);
+        return (isconstant((symbol_t *)ptr(args[0])) ? fl_ctx->T : fl_ctx->F);
     if (iscons(args[0])) {
         if (car_(args[0]) == fl_ctx->QUOTE)
             return fl_ctx->T;
@@ -205,20 +206,22 @@ static value_t fl_integer_valuedp(fl_context_t *fl_ctx, value_t *args, uint32_t 
         return fl_ctx->T;
     }
     else if (iscprim(v)) {
-        numerictype_t nt = cp_numtype((cprim_t*)ptr(v));
+        numerictype_t nt = cp_numtype((cprim_t *)ptr(v));
         if (nt < T_FLOAT)
             return fl_ctx->T;
-        void *data = cp_data((cprim_t*)ptr(v));
+        void *data = cp_data((cprim_t *)ptr(v));
         if (nt == T_FLOAT) {
-            float f = *(float*)data;
-            if (f < 0) f = -f;
+            float f = *(float *)data;
+            if (f < 0)
+                f = -f;
             if (f <= FLT_MAXINT && (float)(int32_t)f == f)
                 return fl_ctx->T;
         }
         else {
             assert(nt == T_DOUBLE);
-            double d = *(double*)data;
-            if (d < 0) d = -d;
+            double d = *(double *)data;
+            if (d < 0)
+                d = -d;
             if (d <= DBL_MAXINT && (double)(int64_t)d == d)
                 return fl_ctx->T;
         }
@@ -230,9 +233,9 @@ static value_t fl_integerp(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "integer?", nargs, 1);
     value_t v = args[0];
-    return (isfixnum(v) ||
-            (iscprim(v) && cp_numtype((cprim_t*)ptr(v)) < T_FLOAT)) ?
-        fl_ctx->T : fl_ctx->F;
+    return (isfixnum(v) || (iscprim(v) && cp_numtype((cprim_t *)ptr(v)) < T_FLOAT)) ?
+               fl_ctx->T :
+               fl_ctx->F;
 }
 
 static value_t fl_fixnum(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
@@ -242,7 +245,7 @@ static value_t fl_fixnum(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
         return args[0];
     }
     else if (iscprim(args[0])) {
-        cprim_t *cp = (cprim_t*)ptr(args[0]);
+        cprim_t *cp = (cprim_t *)ptr(args[0]);
         return fixnum(conv_to_ptrdiff(cp_data(cp), cp_numtype(cp)));
     }
     type_error(fl_ctx, "fixnum", "number", args[0]);
@@ -254,14 +257,14 @@ static value_t fl_truncate(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     if (isfixnum(args[0]))
         return args[0];
     if (iscprim(args[0])) {
-        cprim_t *cp = (cprim_t*)ptr(args[0]);
+        cprim_t *cp = (cprim_t *)ptr(args[0]);
         void *data = cp_data(cp);
         numerictype_t nt = cp_numtype(cp);
         double d;
         if (nt == T_FLOAT)
-            d = (double)*(float*)data;
+            d = (double)*(float *)data;
         else if (nt == T_DOUBLE)
-            d = *(double*)data;
+            d = *(double *)data;
         else
             return args[0];
         if (d > 0) {
@@ -289,11 +292,11 @@ static value_t fl_vector_alloc(fl_context_t *fl_ctx, value_t *args, uint32_t nar
         f = args[1];
     else
         f = FL_UNSPECIFIED(fl_ctx);
-    v = alloc_vector(fl_ctx, (unsigned)i, f==FL_UNSPECIFIED(fl_ctx));
+    v = alloc_vector(fl_ctx, (unsigned)i, f == FL_UNSPECIFIED(fl_ctx));
     if (f != FL_UNSPECIFIED(fl_ctx)) {
         int k;
-        for(k=0; k < i; k++)
-            vector_elt(v,k) = f;
+        for (k = 0; k < i; k++)
+            vector_elt(v, k) = f;
     }
     return v;
 }
@@ -315,13 +318,15 @@ static value_t fl_path_cwd(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
         size_t len = sizeof(buf);
         err = uv_cwd(buf, &len);
         if (err != 0)
-            lerrorf(fl_ctx, fl_ctx->IOError, "path.cwd: could not get cwd: %s", uv_strerror(err));
+            lerrorf(fl_ctx, fl_ctx->IOError, "path.cwd: could not get cwd: %s",
+                    uv_strerror(err));
         return string_from_cstrn(fl_ctx, buf, len);
     }
     char *ptr = tostring(fl_ctx, args[0], "path.cwd");
     err = uv_chdir(ptr);
     if (err != 0)
-        lerrorf(fl_ctx, fl_ctx->IOError, "path.cwd: could not cd to %s: %s", ptr, uv_strerror(err));
+        lerrorf(fl_ctx, fl_ctx->IOError, "path.cwd: could not cd to %s: %s", ptr,
+                uv_strerror(err));
     return fl_ctx->T;
 }
 
@@ -340,7 +345,8 @@ static value_t fl_os_getenv(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     argcount(fl_ctx, "os.getenv", nargs, 1);
     char *name = tostring(fl_ctx, args[0], "os.getenv");
     char *val = getenv(name);
-    if (val == NULL) return fl_ctx->F;
+    if (val == NULL)
+        return fl_ctx->F;
     if (*val == 0)
         return symbol_value(fl_ctx->emptystringsym);
     return cvalue_static_cstring(fl_ctx, val);
@@ -355,17 +361,16 @@ static value_t fl_os_setenv(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 #ifdef _OS_LINUX_
         result = unsetenv(name);
 #elif defined(_OS_WINDOWS_)
-        result = SetEnvironmentVariable(name,NULL);
+        result = SetEnvironmentVariable(name, NULL);
 #else
         (void)unsetenv(name);
         result = 0;
 #endif
-
     }
     else {
         char *val = tostring(fl_ctx, args[1], "os.setenv");
-#if defined (_OS_WINDOWS_)
-        result = SetEnvironmentVariable(name,val);
+#if defined(_OS_WINDOWS_)
+        result = SetEnvironmentVariable(name, val);
 #else
         result = setenv(name, val, 1);
 #endif
@@ -379,37 +384,36 @@ extern void stringfuncs_init(fl_context_t *fl_ctx);
 extern void table_init(fl_context_t *fl_ctx);
 extern void iostream_init(fl_context_t *fl_ctx);
 
-static const builtinspec_t builtin_info[] = {
-    { "environment", fl_global_env },
-    { "constant?", fl_constantp },
-    { "top-level-value", fl_top_level_value },
-    { "set-top-level-value!", fl_set_top_level_value },
-    { "raise", fl_f_raise },
-    { "exit", fl_exit },
-    { "symbol", fl_symbol },
-    { "keyword?", fl_keywordp },
+static const builtinspec_t builtin_info[] = {{"environment", fl_global_env},
+                                             {"constant?", fl_constantp},
+                                             {"top-level-value", fl_top_level_value},
+                                             {"set-top-level-value!",
+                                              fl_set_top_level_value},
+                                             {"raise", fl_f_raise},
+                                             {"exit", fl_exit},
+                                             {"symbol", fl_symbol},
+                                             {"keyword?", fl_keywordp},
 
-    { "fixnum", fl_fixnum },
-    { "truncate", fl_truncate },
-    { "integer?", fl_integerp },
-    { "integer-valued?", fl_integer_valuedp },
-    { "nconc", fl_nconc },
-    { "append!", fl_nconc },
-    { "assq", fl_assq },
-    { "memq", fl_memq },
-    { "length", fl_length },
+                                             {"fixnum", fl_fixnum},
+                                             {"truncate", fl_truncate},
+                                             {"integer?", fl_integerp},
+                                             {"integer-valued?", fl_integer_valuedp},
+                                             {"nconc", fl_nconc},
+                                             {"append!", fl_nconc},
+                                             {"assq", fl_assq},
+                                             {"memq", fl_memq},
+                                             {"length", fl_length},
 
-    { "vector.alloc", fl_vector_alloc },
+                                             {"vector.alloc", fl_vector_alloc},
 
-    { "time.now", fl_time_now },
+                                             {"time.now", fl_time_now},
 
-    { "path.cwd", fl_path_cwd },
-    { "path.exists?", fl_path_exists },
+                                             {"path.cwd", fl_path_cwd},
+                                             {"path.exists?", fl_path_exists},
 
-    { "os.getenv", fl_os_getenv },
-    { "os.setenv", fl_os_setenv },
-    { NULL, NULL }
-};
+                                             {"os.getenv", fl_os_getenv},
+                                             {"os.setenv", fl_os_setenv},
+                                             {NULL, NULL}};
 
 void builtins_init(fl_context_t *fl_ctx)
 {

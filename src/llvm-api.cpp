@@ -98,8 +98,7 @@ extern "C" JL_DLLEXPORT void LLVMExtraAddBarrierNoopPass(LLVMPassManagerRef PM)
 typedef struct LLVMOpaquePass *LLVMPassRef;
 DEFINE_STDCXX_CONVERSION_FUNCTIONS(Pass, LLVMPassRef)
 
-extern "C" JL_DLLEXPORT void
-LLVMExtraAddPass(LLVMPassManagerRef PM, LLVMPassRef P)
+extern "C" JL_DLLEXPORT void LLVMExtraAddPass(LLVMPassManagerRef PM, LLVMPassRef P)
 {
     unwrap(PM)->add(unwrap(P));
 }
@@ -117,7 +116,7 @@ char &CreatePassID(const char *Name)
 class JuliaModulePass : public ModulePass {
 public:
     JuliaModulePass(const char *Name, jl_value_t *Callback)
-        : ModulePass(CreatePassID(Name)), Callback(Callback)
+      : ModulePass(CreatePassID(Name)), Callback(Callback)
     {
     }
 
@@ -139,8 +138,8 @@ private:
     jl_value_t *Callback;
 };
 
-extern "C" JL_DLLEXPORT LLVMPassRef
-LLVMExtraCreateModulePass(const char *Name, jl_value_t *Callback)
+extern "C" JL_DLLEXPORT LLVMPassRef LLVMExtraCreateModulePass(const char *Name,
+                                                              jl_value_t *Callback)
 {
     return wrap(new JuliaModulePass(Name, Callback));
 }
@@ -148,7 +147,7 @@ LLVMExtraCreateModulePass(const char *Name, jl_value_t *Callback)
 class JuliaFunctionPass : public FunctionPass {
 public:
     JuliaFunctionPass(const char *Name, jl_value_t *Callback)
-        : FunctionPass(CreatePassID(Name)), Callback(Callback)
+      : FunctionPass(CreatePassID(Name)), Callback(Callback)
     {
     }
 
@@ -170,8 +169,8 @@ private:
     jl_value_t *Callback;
 };
 
-extern "C" JL_DLLEXPORT LLVMPassRef
-LLVMExtraCreateFunctionPass(const char *Name, jl_value_t *Callback)
+extern "C" JL_DLLEXPORT LLVMPassRef LLVMExtraCreateFunctionPass(const char *Name,
+                                                                jl_value_t *Callback)
 {
     return wrap(new JuliaFunctionPass(Name, Callback));
 }
@@ -189,14 +188,15 @@ extern "C" JL_DLLEXPORT LLVMContextRef LLVMExtraGetValueContext(LLVMValueRef V)
     return wrap(&unwrap(V)->getContext());
 }
 
-extern "C" JL_DLLEXPORT void
-LLVMExtraAddTargetLibraryInfoByTiple(const char *T, LLVMPassManagerRef PM)
+extern "C" JL_DLLEXPORT void LLVMExtraAddTargetLibraryInfoByTiple(const char *T,
+                                                                  LLVMPassManagerRef PM)
 {
     unwrap(PM)->add(new TargetLibraryInfoWrapperPass(Triple(T)));
 }
 
-extern "C" JL_DLLEXPORT void LLVMExtraAddInternalizePassWithExportList(
-        LLVMPassManagerRef PM, const char **ExportList, size_t Length)
+extern "C" JL_DLLEXPORT void
+LLVMExtraAddInternalizePassWithExportList(LLVMPassManagerRef PM, const char **ExportList,
+                                          size_t Length)
 {
     auto PreserveFobj = [=](const GlobalValue &GV) {
         for (size_t i = 0; i < Length; i++) {
@@ -211,14 +211,12 @@ extern "C" JL_DLLEXPORT void LLVMExtraAddInternalizePassWithExportList(
 
 // Awaiting D46627
 
-extern "C" JL_DLLEXPORT int LLVMExtraGetSourceLocation(LLVMValueRef V, int index,
-                                                        const char** Name,
-                                                        const char** Filename,
-                                                        unsigned int* Line,
-                                                        unsigned int* Column)
+extern "C" JL_DLLEXPORT int
+LLVMExtraGetSourceLocation(LLVMValueRef V, int index, const char **Name,
+                           const char **Filename, unsigned int *Line, unsigned int *Column)
 {
     if (auto I = dyn_cast<Instruction>(unwrap(V))) {
-        const DILocation* DIL = I->getDebugLoc();
+        const DILocation *DIL = I->getDebugLoc();
         if (!DIL)
             return 0;
 
@@ -234,9 +232,10 @@ extern "C" JL_DLLEXPORT int LLVMExtraGetSourceLocation(LLVMValueRef V, int index
         *Column = DIL->getColumn();
 
         return 1;
-
-    } else {
-        jl_exceptionf(jl_argumenterror_type, "Can only get source location information of instructions");
+    }
+    else {
+        jl_exceptionf(jl_argumenterror_type,
+                      "Can only get source location information of instructions");
     }
 }
 

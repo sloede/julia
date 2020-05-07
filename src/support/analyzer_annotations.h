@@ -20,12 +20,13 @@
 #define JL_ALWAYS_LEAFTYPE JL_GLOBALLY_ROOTED
 #define JL_ROOTS_TEMPORARILY __attribute__((annotate("julia_temporarily_roots")))
 #define JL_REQUIRE_ROOTED_SLOT __attribute__((annotate("julia_require_rooted_slot")))
-#define JL_ROOTED_VALUE_COLLECTION __attribute__((annotate("julia_rooted_value_collection")))
+#define JL_ROOTED_VALUE_COLLECTION \
+    __attribute__((annotate("julia_rooted_value_collection")))
 #ifdef __cplusplus
 extern "C" {
 #endif
-  void JL_GC_PROMISE_ROOTED(void *v) JL_NOTSAFEPOINT;
-  void jl_may_leak(uintptr_t) JL_NOTSAFEPOINT;
+void JL_GC_PROMISE_ROOTED(void *v) JL_NOTSAFEPOINT;
+void jl_may_leak(uintptr_t) JL_NOTSAFEPOINT;
 #ifdef __cplusplus
 }
 #endif

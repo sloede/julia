@@ -7,19 +7,19 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
+#include <llvm/ADT/SetVector.h>
 #include <llvm/ADT/SmallSet.h>
 #include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/SetVector.h>
-#include <llvm/IR/Value.h>
 #include <llvm/IR/CFG.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Operator.h>
-#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Value.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Transforms/Utils/PromoteMemToReg.h>
@@ -39,7 +39,8 @@
 
 using namespace llvm;
 
-extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
+extern std::pair<MDNode *, MDNode *>
+tbaa_make_child(const char *name, MDNode *parent = nullptr, bool isConstant = false);
 
 namespace {
 
@@ -57,7 +58,7 @@ static void removeGCPreserve(CallInst *call, Instruction *val)
 {
     auto replace = Constant::getNullValue(val->getType());
     call->replaceUsesOfWith(val, replace);
-    for (auto &arg: call->arg_operands()) {
+    for (auto &arg : call->arg_operands()) {
         if (!isa<Constant>(arg.get())) {
             return;
         }
@@ -83,7 +84,7 @@ static bool hasObjref(Type *ty)
         return hasObjref(seqty->getElementType());
 #endif
     if (auto structty = dyn_cast<StructType>(ty)) {
-        for (auto elty: structty->elements()) {
+        for (auto elty : structty->elements()) {
             if (hasObjref(elty)) {
                 return true;
             }
@@ -119,8 +120,7 @@ static bool hasObjref(Type *ty)
 
 struct AllocOpt : public FunctionPass {
     static char ID;
-    AllocOpt()
-        : FunctionPass(ID)
+    AllocOpt() : FunctionPass(ID)
     {
         llvm::initializeDominatorTreeWrapperPassPass(*PassRegistry::getPassRegistry());
     }
@@ -161,14 +161,12 @@ private:
 };
 
 struct Optimizer {
-    Optimizer(Function &F, AllocOpt &pass)
-        : F(F),
-          pass(pass)
-    {}
+    Optimizer(Function &F, AllocOpt &pass) : F(F), pass(pass) {}
 
     void initialize();
     void optimizeAll();
     bool finalize();
+
 private:
     bool isSafepoint(Instruction *inst);
     Instruction *getFirstSafepoint(BasicBlock *bb);
@@ -181,8 +179,8 @@ private:
 
     void checkInst(Instruction *I);
 
-    void replaceIntrinsicUseWith(IntrinsicInst *call, Intrinsic::ID ID,
-                                 Instruction *orig_i, Instruction *new_i);
+    void replaceIntrinsicUseWith(IntrinsicInst *call, Intrinsic::ID ID, Instruction *orig_i,
+                                 Instruction *new_i);
     void removeAlloc(CallInst *orig_inst);
     void moveToStack(CallInst *orig_inst, size_t sz, bool has_ref);
     void splitOnStack(CallInst *orig_inst);
@@ -205,20 +203,16 @@ private:
             Instruction::use_iterator use_it;
             Instruction::use_iterator use_end;
         };
-        typedef SmallVector<Frame,4> Stack;
+        typedef SmallVector<Frame, 4> Stack;
     };
     struct Lifetime {
         struct Frame {
             BasicBlock *bb;
             pred_iterator p_cur;
             pred_iterator p_end;
-            Frame(BasicBlock *bb)
-                : bb(bb),
-                  p_cur(pred_begin(bb)),
-                  p_end(pred_end(bb))
-            {}
+            Frame(BasicBlock *bb) : bb(bb), p_cur(pred_begin(bb)), p_end(pred_end(bb)) {}
         };
-        typedef SmallVector<Frame,4> Stack;
+        typedef SmallVector<Frame, 4> Stack;
     };
     struct ReplaceUses {
         struct Frame {
@@ -227,16 +221,10 @@ private:
                 Instruction *new_i;
                 uint32_t offset;
             };
-            Frame(Instruction *orig_i, Instruction *new_i)
-                : orig_i(orig_i),
-                  new_i(new_i)
-            {}
-            Frame(Instruction *orig_i, uint32_t offset)
-                : orig_i(orig_i),
-                  offset(offset)
-            {}
+            Frame(Instruction *orig_i, Instruction *new_i) : orig_i(orig_i), new_i(new_i) {}
+            Frame(Instruction *orig_i, uint32_t offset) : orig_i(orig_i), offset(offset) {}
         };
-        typedef SmallVector<Frame,4> Stack;
+        typedef SmallVector<Frame, 4> Stack;
     };
 
     struct MemOp {
@@ -244,56 +232,54 @@ private:
         unsigned opno;
         uint32_t offset = 0;
         uint32_t size = 0;
-        bool isobjref:1;
-        bool isaggr:1;
+        bool isobjref : 1;
+        bool isaggr : 1;
         MemOp(Instruction *inst, unsigned opno)
-            : inst(inst),
-              opno(opno),
-              isobjref(false),
-              isaggr(false)
-        {}
+          : inst(inst), opno(opno), isobjref(false), isaggr(false)
+        {
+        }
     };
     struct Field {
         uint32_t size;
-        bool hasobjref:1;
-        bool hasaggr:1;
-        bool multiloc:1;
-        bool hasload:1;
+        bool hasobjref : 1;
+        bool hasaggr : 1;
+        bool multiloc : 1;
+        bool hasload : 1;
         Type *elty;
-        SmallVector<MemOp,4> accesses;
+        SmallVector<MemOp, 4> accesses;
         Field(uint32_t size, Type *elty)
-            : size(size),
-              hasobjref(false),
-              hasaggr(false),
-              multiloc(false),
-              hasload(false),
-              elty(elty)
+          : size(size),
+            hasobjref(false),
+            hasaggr(false),
+            multiloc(false),
+            hasload(false),
+            elty(elty)
         {
         }
     };
     struct AllocUseInfo {
-        SmallSet<Instruction*,16> uses;
-        SmallSet<CallInst*,4> preserves;
-        std::map<uint32_t,Field> memops;
+        SmallSet<Instruction *, 16> uses;
+        SmallSet<CallInst *, 4> preserves;
+        std::map<uint32_t, Field> memops;
         // Completely unknown use
-        bool escaped:1;
+        bool escaped : 1;
         // Address is leaked to functions that doesn't care where the object is allocated.
-        bool addrescaped:1;
+        bool addrescaped : 1;
         // There are reader of the memory
-        bool hasload:1;
+        bool hasload : 1;
         // There are uses in gc_preserve intrinsics or ccall roots
-        bool haspreserve:1;
+        bool haspreserve : 1;
         // There are objects fields being loaded
-        bool refload:1;
+        bool refload : 1;
         // There are objects fields being stored
-        bool refstore:1;
+        bool refstore : 1;
         // There are memset call
-        bool hasmemset:1;
-        // There are store/load/memset on this object with offset or size (or value for memset)
-        // that cannot be statically computed.
-        // This is a weaker form of `addrescaped` since `hasload` can still be used
-        // to see if the memory is actually being used
-        bool hasunknownmem:1;
+        bool hasmemset : 1;
+        // There are store/load/memset on this object with offset or size (or value for
+        // memset) that cannot be statically computed. This is a weaker form of
+        // `addrescaped` since `hasload` can still be used to see if the memory is actually
+        // being used
+        bool hasunknownmem : 1;
         void reset()
         {
             escaped = false;
@@ -310,8 +296,9 @@ private:
         void dump();
         bool addMemOp(Instruction *inst, unsigned opno, uint32_t offset, Type *elty,
                       bool isstore, const DataLayout &DL);
-        std::pair<const uint32_t,Field> &getField(uint32_t offset, uint32_t size, Type *elty);
-        std::map<uint32_t,Field>::iterator findLowerField(uint32_t offset)
+        std::pair<const uint32_t, Field> &getField(uint32_t offset, uint32_t size,
+                                                   Type *elty);
+        std::map<uint32_t, Field>::iterator findLowerField(uint32_t offset)
         {
             // Find the last field that starts no higher than `offset`.
             auto it = memops.upper_bound(offset);
@@ -321,13 +308,13 @@ private:
         }
     };
 
-    SetVector<std::pair<CallInst*,size_t>> worklist;
-    SmallVector<CallInst*,6> removed;
+    SetVector<std::pair<CallInst *, size_t>> worklist;
+    SmallVector<CallInst *, 6> removed;
     AllocUseInfo use_info;
     CheckInst::Stack check_stack;
     Lifetime::Stack lifetime_stack;
     ReplaceUses::Stack replace_stack;
-    std::map<BasicBlock*, llvm::WeakVH> first_safepoint;
+    std::map<BasicBlock *, llvm::WeakVH> first_safepoint;
 };
 
 void Optimizer::pushInstruction(Instruction *I)
@@ -340,8 +327,8 @@ void Optimizer::pushInstruction(Instruction *I)
 
 void Optimizer::initialize()
 {
-    for (auto &bb: F) {
-        for (auto &I: bb) {
+    for (auto &bb : F) {
+        for (auto &I : bb) {
             pushInstruction(&I);
         }
     }
@@ -356,8 +343,8 @@ void Optimizer::optimizeAll()
         checkInst(orig);
         if (use_info.escaped)
             continue;
-        if (!use_info.addrescaped && !use_info.hasload && (!use_info.haspreserve ||
-                                                           !use_info.refstore)) {
+        if (!use_info.addrescaped && !use_info.hasload &&
+            (!use_info.haspreserve || !use_info.refstore)) {
             // No one took the address, no one reads anything and there's no meaningful
             // preserve of fields (either no preserve/ccall or no object reference fields)
             // We can just delete all the uses.
@@ -366,7 +353,7 @@ void Optimizer::optimizeAll()
         }
         bool has_ref = false;
         bool has_refaggr = false;
-        for (auto memop: use_info.memops) {
+        for (auto memop : use_info.memops) {
             auto &field = memop.second;
             if (field.hasobjref) {
                 has_ref = true;
@@ -387,7 +374,8 @@ void Optimizer::optimizeAll()
                 use_info.memops.begin()->second.size != sz) {
                 continue;
             }
-            // The object only has a single field that's a reference with only one kind of access.
+            // The object only has a single field that's a reference with only one kind of
+            // access.
         }
         moveToStack(orig, sz, has_ref);
     }
@@ -397,7 +385,7 @@ bool Optimizer::finalize()
 {
     if (removed.empty())
         return false;
-    for (auto inst: removed)
+    for (auto inst : removed)
         inst->eraseFromParent();
     return true;
 }
@@ -427,7 +415,7 @@ Instruction *Optimizer::getFirstSafepoint(BasicBlock *bb)
             return cast<Instruction>(Val);
     }
     Instruction *first = nullptr;
-    for (auto &I: *bb) {
+    for (auto &I : *bb) {
         if (isSafepoint(&I)) {
             first = &I;
             break;
@@ -451,7 +439,7 @@ ssize_t Optimizer::getGCAllocSize(Instruction *I)
     return -1;
 }
 
-std::pair<const uint32_t,Optimizer::Field>&
+std::pair<const uint32_t, Optimizer::Field> &
 Optimizer::AllocUseInfo::getField(uint32_t offset, uint32_t size, Type *elty)
 {
     auto it = findLowerField(offset);
@@ -544,20 +532,20 @@ JL_USED_FUNC void Optimizer::AllocUseInfo::dump()
     jl_safe_printf("refstore: %d\n", refstore);
     jl_safe_printf("hasunknownmem: %d\n", hasunknownmem);
     jl_safe_printf("Uses: %d\n", (unsigned)uses.size());
-    for (auto inst: uses)
+    for (auto inst : uses)
         llvm_dump(inst);
     if (!preserves.empty()) {
         jl_safe_printf("Preserves: %d\n", (unsigned)preserves.size());
-        for (auto inst: preserves) {
+        for (auto inst : preserves) {
             llvm_dump(inst);
         }
     }
     if (!memops.empty()) {
         jl_safe_printf("Memops: %d\n", (unsigned)memops.size());
-        for (auto &field: memops) {
+        for (auto &field : memops) {
             jl_safe_printf("  Field %d @ %d\n", field.second.size, field.first);
             jl_safe_printf("    Accesses:\n");
-            for (auto memop: field.second.accesses) {
+            for (auto memop : field.second.accesses) {
                 jl_safe_printf("    ");
                 llvm_dump(memop.inst);
             }
@@ -574,7 +562,7 @@ void Optimizer::checkInst(Instruction *I)
     check_stack.clear();
 
     // Recursion
-    auto push_inst = [&] (Instruction *inst) {
+    auto push_inst = [&](Instruction *inst) {
         if (cur.use_it != cur.use_end)
             check_stack.push_back(cur);
         cur.parent = inst;
@@ -582,12 +570,11 @@ void Optimizer::checkInst(Instruction *I)
         cur.use_end = inst->use_end();
     };
 
-    auto check_inst = [&] (Instruction *inst, Use *use) {
+    auto check_inst = [&](Instruction *inst, Use *use) {
         if (isa<LoadInst>(inst)) {
             use_info.hasload = true;
-            if (cur.offset == UINT32_MAX || !use_info.addMemOp(inst, 0, cur.offset,
-                                                               inst->getType(),
-                                                               false, *pass.DL))
+            if (cur.offset == UINT32_MAX ||
+                !use_info.addMemOp(inst, 0, cur.offset, inst->getType(), false, *pass.DL))
                 use_info.hasunknownmem = true;
             return true;
         }
@@ -615,7 +602,7 @@ void Optimizer::checkInst(Instruction *I)
                     return true;
                 }
                 if (pass.gc_preserve_begin == callee) {
-                    for (auto user: call->users())
+                    for (auto user : call->users())
                         use_info.uses.insert(cast<Instruction>(user));
                     use_info.preserves.insert(call);
                     use_info.haspreserve = true;
@@ -629,7 +616,8 @@ void Optimizer::checkInst(Instruction *I)
             if (pass.typeof_func == callee || pass.write_barrier_func == callee)
                 return true;
             auto opno = use->getOperandNo();
-            // Uses in `jl_roots` operand bundle are not counted as escaping, everything else is.
+            // Uses in `jl_roots` operand bundle are not counted as escaping, everything
+            // else is.
             if (!isBundleOperand(call, opno) ||
                 call->getOperandBundleForOperand(opno).getTagName() != "jl_roots") {
                 use_info.escaped = true;
@@ -645,9 +633,9 @@ void Optimizer::checkInst(Instruction *I)
                 return false;
             }
             auto storev = store->getValueOperand();
-            if (cur.offset == UINT32_MAX || !use_info.addMemOp(inst, use->getOperandNo(),
-                                                               cur.offset, storev->getType(),
-                                                               true, *pass.DL))
+            if (cur.offset == UINT32_MAX ||
+                !use_info.addMemOp(inst, use->getOperandNo(), cur.offset, storev->getType(),
+                                   true, *pass.DL))
                 use_info.hasunknownmem = true;
             return true;
         }
@@ -658,8 +646,9 @@ void Optimizer::checkInst(Instruction *I)
         if (auto gep = dyn_cast<GetElementPtrInst>(inst)) {
             uint64_t next_offset = cur.offset;
             if (cur.offset != UINT32_MAX) {
-                APInt apoffset(sizeof(void*) * 8, cur.offset, true);
-                if (!gep->accumulateConstantOffset(*pass.DL, apoffset) || apoffset.isNegative()) {
+                APInt apoffset(sizeof(void *) * 8, cur.offset, true);
+                if (!gep->accumulateConstantOffset(*pass.DL, apoffset) ||
+                    apoffset.isNegative()) {
                     next_offset = UINT32_MAX;
                 }
                 else {
@@ -724,10 +713,10 @@ void Optimizer::insertLifetime(Value *ptr, Constant *sz, Instruction *orig)
 {
     CallInst::Create(pass.lifetime_start, {sz, ptr}, "", orig);
     BasicBlock *def_bb = orig->getParent();
-    std::set<BasicBlock*> bbs{def_bb};
+    std::set<BasicBlock *> bbs{def_bb};
     auto &DT = getDomTree();
     // Collect all BB where the allocation is live
-    for (auto use: use_info.uses) {
+    for (auto use : use_info.uses) {
         auto bb = use->getParent();
         if (!bbs.insert(bb).second)
             continue;
@@ -751,7 +740,7 @@ void Optimizer::insertLifetime(Value *ptr, Constant *sz, Instruction *orig)
         }
     }
 #ifndef JL_NDEBUG
-    for (auto bb: bbs) {
+    for (auto bb : bbs) {
         if (bb == def_bb)
             continue;
         if (DT.dominates(orig, bb))
@@ -765,17 +754,17 @@ void Optimizer::insertLifetime(Value *ptr, Constant *sz, Instruction *orig)
     }
 #endif
     // Record extra BBs that contain invisible uses.
-    SmallSet<BasicBlock*, 8> extra_use;
-    SmallVector<DomTreeNodeBase<BasicBlock>*, 8> dominated;
-    for (auto preserve: use_info.preserves) {
+    SmallSet<BasicBlock *, 8> extra_use;
+    SmallVector<DomTreeNodeBase<BasicBlock> *, 8> dominated;
+    for (auto preserve : use_info.preserves) {
         for (auto RN = DT.getNode(preserve->getParent()); RN;
              RN = dominated.empty() ? nullptr : dominated.pop_back_val()) {
-            for (auto N: *RN) {
+            for (auto N : *RN) {
                 auto bb = N->getBlock();
                 if (extra_use.count(bb))
                     continue;
                 bool ended = false;
-                for (auto end: preserve->users()) {
+                for (auto end : preserve->users()) {
                     auto end_bb = cast<Instruction>(end)->getParent();
                     auto end_node = DT.getNode(end_bb);
                     if (end_bb == bb || (end_node && DT.dominates(end_node, N))) {
@@ -798,10 +787,10 @@ void Optimizer::insertLifetime(Value *ptr, Constant *sz, Instruction *orig)
     // within the BB.
     // If some successors are live and others are dead, it's the first instruction in
     // the successors that are dead.
-    std::vector<Instruction*> first_dead;
-    for (auto bb: bbs) {
+    std::vector<Instruction *> first_dead;
+    for (auto bb : bbs) {
         bool has_use = false;
-        for (auto succ: successors(bb)) {
+        for (auto succ : successors(bb)) {
             // def_bb is the only bb in bbs that's not dominated by orig
             if (succ != def_bb && bbs.count(succ)) {
                 has_use = true;
@@ -809,7 +798,7 @@ void Optimizer::insertLifetime(Value *ptr, Constant *sz, Instruction *orig)
             }
         }
         if (has_use) {
-            for (auto succ: successors(bb)) {
+            for (auto succ : successors(bb)) {
                 if (!bbs.count(succ)) {
                     first_dead.push_back(&*succ->begin());
                 }
@@ -869,7 +858,7 @@ void Optimizer::insertLifetime(Value *ptr, Constant *sz, Instruction *orig)
                 continue;
             }
         }
-        for (auto succ: successors(bb)) {
+        for (auto succ : successors(bb)) {
             first_dead.push_back(&*succ->begin());
         }
     }
@@ -879,22 +868,22 @@ void Optimizer::replaceIntrinsicUseWith(IntrinsicInst *call, Intrinsic::ID ID,
                                         Instruction *orig_i, Instruction *new_i)
 {
     auto nargs = call->getNumArgOperands();
-    SmallVector<Value*, 8> args(nargs);
-    SmallVector<Type*, 8> argTys(nargs);
+    SmallVector<Value *, 8> args(nargs);
+    SmallVector<Type *, 8> argTys(nargs);
     for (unsigned i = 0; i < nargs; i++) {
         auto arg = call->getArgOperand(i);
         args[i] = arg == orig_i ? new_i : arg;
         argTys[i] = args[i]->getType();
     }
     auto oldfType = call->getFunctionType();
-    auto newfType = FunctionType::get(
-            oldfType->getReturnType(),
-            makeArrayRef(argTys).slice(0, oldfType->getNumParams()),
-            oldfType->isVarArg());
+    auto newfType =
+        FunctionType::get(oldfType->getReturnType(),
+                          makeArrayRef(argTys).slice(0, oldfType->getNumParams()),
+                          oldfType->isVarArg());
 
     // Accumulate an array of overloaded types for the given intrinsic
     // and compute the new name mangling schema
-    SmallVector<Type*, 4> overloadTys;
+    SmallVector<Type *, 4> overloadTys;
     {
         SmallVector<Intrinsic::IITDescriptor, 8> Table;
         getIntrinsicInfoTableEntries(ID, Table);
@@ -904,7 +893,8 @@ void Optimizer::replaceIntrinsicUseWith(IntrinsicInst *call, Intrinsic::ID ID,
         assert(res == Intrinsic::MatchIntrinsicTypes_Match);
         (void)res;
 #else
-        bool res = Intrinsic::matchIntrinsicType(oldfType->getReturnType(), TableRef, overloadTys);
+        bool res =
+            Intrinsic::matchIntrinsicType(oldfType->getReturnType(), TableRef, overloadTys);
         assert(!res);
         for (auto Ty : newfType->params()) {
             res = Intrinsic::matchIntrinsicType(Ty, TableRef, overloadTys);
@@ -929,8 +919,8 @@ void Optimizer::replaceIntrinsicUseWith(IntrinsicInst *call, Intrinsic::ID ID,
     call->eraseFromParent();
 }
 
-// This function should not erase any safepoint so that the lifetime marker can find and cache
-// all the original safepoints.
+// This function should not erase any safepoint so that the lifetime marker can find and
+// cache all the original safepoints.
 void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
 {
     auto tag = orig_inst->getArgOperand(2);
@@ -969,7 +959,7 @@ void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
     auto new_inst = cast<Instruction>(prolog_builder.CreateBitCast(ptr, pass.T_pjlvalue));
     new_inst->takeName(orig_inst);
 
-    auto simple_replace = [&] (Instruction *orig_i, Instruction *new_i) {
+    auto simple_replace = [&](Instruction *orig_i, Instruction *new_i) {
         if (orig_i->user_empty()) {
             if (orig_i != orig_inst)
                 orig_i->eraseFromParent();
@@ -989,13 +979,13 @@ void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
         return;
     assert(replace_stack.empty());
     ReplaceUses::Frame cur{orig_inst, new_inst};
-    auto finish_cur = [&] () {
+    auto finish_cur = [&]() {
         assert(cur.orig_i->user_empty());
         if (cur.orig_i != orig_inst) {
             cur.orig_i->eraseFromParent();
         }
     };
-    auto push_frame = [&] (Instruction *orig_i, Instruction *new_i) {
+    auto push_frame = [&](Instruction *orig_i, Instruction *new_i) {
         if (simple_replace(orig_i, new_i))
             return;
         replace_stack.push_back(cur);
@@ -1003,7 +993,7 @@ void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
     };
     // Both `orig_i` and `new_i` should be pointer of the same type
     // but possibly different address spaces. `new_i` is always in addrspace 0.
-    auto replace_inst = [&] (Instruction *user) {
+    auto replace_inst = [&](Instruction *user) {
         Instruction *orig_i = cur.orig_i;
         Instruction *new_i = cur.new_i;
         if (isa<LoadInst>(user) || isa<StoreInst>(user)) {
@@ -1042,12 +1032,13 @@ void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
                 }
             }
             // remove from operand bundle
-            Value *replace = has_ref ? (Value*)buff : Constant::getNullValue(orig_i->getType());
+            Value *replace =
+                has_ref ? (Value *)buff : Constant::getNullValue(orig_i->getType());
             user->replaceUsesOfWith(orig_i, replace);
         }
         else if (isa<AddrSpaceCastInst>(user) || isa<BitCastInst>(user)) {
-            auto cast_t = PointerType::get(cast<PointerType>(user->getType())->getElementType(),
-                                           0);
+            auto cast_t =
+                PointerType::get(cast<PointerType>(user->getType())->getElementType(), 0);
             auto replace_i = new_i;
             Type *new_t = new_i->getType();
             if (cast_t != new_t) {
@@ -1059,9 +1050,8 @@ void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
         }
         else if (auto gep = dyn_cast<GetElementPtrInst>(user)) {
             SmallVector<Value *, 4> IdxOperands(gep->idx_begin(), gep->idx_end());
-            auto new_gep = GetElementPtrInst::Create(gep->getSourceElementType(),
-                                                     new_i, IdxOperands,
-                                                     gep->getName(), gep);
+            auto new_gep = GetElementPtrInst::Create(gep->getSourceElementType(), new_i,
+                                                     IdxOperands, gep->getName(), gep);
             new_gep->setIsInBounds(gep->isInBounds());
             new_gep->takeName(gep);
             copyMetadata(new_gep, gep);
@@ -1084,13 +1074,13 @@ void Optimizer::moveToStack(CallInst *orig_inst, size_t sz, bool has_ref)
     }
 }
 
-// This function should not erase any safepoint so that the lifetime marker can find and cache
-// all the original safepoints.
+// This function should not erase any safepoint so that the lifetime marker can find and
+// cache all the original safepoints.
 void Optimizer::removeAlloc(CallInst *orig_inst)
 {
     auto tag = orig_inst->getArgOperand(2);
     removed.push_back(orig_inst);
-    auto simple_remove = [&] (Instruction *orig_i) {
+    auto simple_remove = [&](Instruction *orig_i) {
         if (orig_i->user_empty()) {
             if (orig_i != orig_inst)
                 orig_i->eraseFromParent();
@@ -1102,19 +1092,19 @@ void Optimizer::removeAlloc(CallInst *orig_inst)
         return;
     assert(replace_stack.empty());
     ReplaceUses::Frame cur{orig_inst, nullptr};
-    auto finish_cur = [&] () {
+    auto finish_cur = [&]() {
         assert(cur.orig_i->user_empty());
         if (cur.orig_i != orig_inst) {
             cur.orig_i->eraseFromParent();
         }
     };
-    auto push_frame = [&] (Instruction *orig_i) {
+    auto push_frame = [&](Instruction *orig_i) {
         if (simple_remove(orig_i))
             return;
         replace_stack.push_back(cur);
         cur = {orig_i, nullptr};
     };
-    auto remove_inst = [&] (Instruction *user) {
+    auto remove_inst = [&](Instruction *user) {
         Instruction *orig_i = cur.orig_i;
         if (auto store = dyn_cast<StoreInst>(user)) {
             // All stores are known to be dead.
@@ -1183,8 +1173,8 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
         uint32_t offset;
         uint32_t size;
     };
-    SmallVector<SplitSlot,8> slots;
-    for (auto memop: use_info.memops) {
+    SmallVector<SplitSlot, 8> slots;
+    for (auto memop : use_info.memops) {
         auto offset = memop.first;
         auto &field = memop.second;
         // If the field has no reader and is not a object reference field that we
@@ -1208,7 +1198,7 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
         slots.push_back(std::move(slot));
     }
     const auto nslots = slots.size();
-    auto find_slot = [&] (uint32_t offset) {
+    auto find_slot = [&](uint32_t offset) {
         if (offset == 0)
             return 0u;
         unsigned lb = 0;
@@ -1224,7 +1214,7 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
         }
         return lb;
     };
-    auto simple_replace = [&] (Instruction *orig_i) {
+    auto simple_replace = [&](Instruction *orig_i) {
         if (orig_i->user_empty()) {
             if (orig_i != orig_inst)
                 orig_i->eraseFromParent();
@@ -1236,19 +1226,20 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
         return;
     assert(replace_stack.empty());
     ReplaceUses::Frame cur{orig_inst, uint32_t(0)};
-    auto finish_cur = [&] () {
+    auto finish_cur = [&]() {
         assert(cur.orig_i->user_empty());
         if (cur.orig_i != orig_inst) {
             cur.orig_i->eraseFromParent();
         }
     };
-    auto push_frame = [&] (Instruction *orig_i, uint32_t offset) {
+    auto push_frame = [&](Instruction *orig_i, uint32_t offset) {
         if (simple_replace(orig_i))
             return;
         replace_stack.push_back(cur);
         cur = {orig_i, offset};
     };
-    auto slot_gep = [&] (SplitSlot &slot, uint32_t offset, Type *elty, IRBuilder<> &builder) {
+    auto slot_gep = [&](SplitSlot &slot, uint32_t offset, Type *elty,
+                        IRBuilder<> &builder) {
         assert(slot.offset <= offset);
         offset -= slot.offset;
         auto size = pass.DL->getTypeAllocSize(elty);
@@ -1266,7 +1257,7 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
         }
         return addr;
     };
-    auto replace_inst = [&] (Use *use) {
+    auto replace_inst = [&](Use *use) {
         Instruction *user = cast<Instruction>(use->getUser());
         Instruction *orig_i = cur.orig_i;
         uint32_t offset = cur.offset;
@@ -1310,8 +1301,10 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
                     store_ty = pass.T_pjlvalue;
                 }
                 else {
-                    store_ty = cast<PointerType>(pass.T_pjlvalue)->getElementType()
-                        ->getPointerTo(cast<PointerType>(store_ty)->getAddressSpace());
+                    store_ty =
+                        cast<PointerType>(pass.T_pjlvalue)
+                            ->getElementType()
+                            ->getPointerTo(cast<PointerType>(store_ty)->getAddressSpace());
                     store_val = builder.CreateBitCast(store_val, store_ty);
                 }
                 if (cast<PointerType>(store_ty)->getAddressSpace() != AddressSpace::Tracked)
@@ -1336,7 +1329,8 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
                         uint32_t size = size_arg->getLimitedValue();
                         for (unsigned idx = find_slot(offset); idx < nslots; idx++) {
                             auto &slot = slots[idx];
-                            if (slot.offset + slot.size <= offset || slot.offset >= offset + size)
+                            if (slot.offset + slot.size <= offset ||
+                                slot.offset >= offset + size)
                                 break;
                             if (slot.isref) {
                                 assert(slot.offset >= offset &&
@@ -1350,16 +1344,18 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
                                     memset(&intval, val, 8);
                                     Constant *val = ConstantInt::get(pass.T_size, intval);
                                     val = ConstantExpr::getIntToPtr(val, pass.T_pjlvalue);
-                                    ptr = ConstantExpr::getAddrSpaceCast(val, pass.T_prjlvalue);
+                                    ptr = ConstantExpr::getAddrSpaceCast(val,
+                                                                         pass.T_prjlvalue);
                                 }
                                 builder.CreateStore(ptr, slot.slot);
                                 continue;
                             }
                             auto ptr8 = builder.CreateBitCast(slot.slot, pass.T_pint8);
                             if (offset > slot.offset)
-                                ptr8 = builder.CreateConstInBoundsGEP1_32(pass.T_int8, ptr8,
-                                                                          offset - slot.offset);
-                            auto sub_size = std::min(slot.offset + slot.size, offset + size) -
+                                ptr8 = builder.CreateConstInBoundsGEP1_32(
+                                    pass.T_int8, ptr8, offset - slot.offset);
+                            auto sub_size =
+                                std::min(slot.offset + slot.size, offset + size) -
                                 std::max(offset, slot.offset);
 #if JL_LLVM_VERSION >= 100000
                             builder.CreateMemSet(ptr8, val_arg, sub_size, MaybeAlign(0));
@@ -1384,14 +1380,14 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
                 return;
             }
             if (pass.gc_preserve_begin == callee) {
-                SmallVector<Value*,8> operands;
-                for (auto &arg: call->arg_operands()) {
+                SmallVector<Value *, 8> operands;
+                for (auto &arg : call->arg_operands()) {
                     if (arg.get() == orig_i || isa<Constant>(arg.get()))
                         continue;
                     operands.push_back(arg.get());
                 }
                 IRBuilder<> builder(call);
-                for (auto &slot: slots) {
+                for (auto &slot : slots) {
                     if (!slot.isref)
                         continue;
                     operands.push_back(builder.CreateLoad(pass.T_prjlvalue, slot.slot));
@@ -1407,19 +1403,19 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
             assert(isBundleOperand(call, use->getOperandNo()));
             assert(call->getOperandBundleForOperand(use->getOperandNo()).getTagName() ==
                    "jl_roots");
-            SmallVector<OperandBundleDef,2> bundles;
+            SmallVector<OperandBundleDef, 2> bundles;
             call->getOperandBundlesAsDefs(bundles);
-            for (auto &bundle: bundles) {
+            for (auto &bundle : bundles) {
                 if (bundle.getTag() != "jl_roots")
                     continue;
-                std::vector<Value*> operands;
-                for (auto op: bundle.inputs()) {
+                std::vector<Value *> operands;
+                for (auto op : bundle.inputs()) {
                     if (op == orig_i || isa<Constant>(op))
                         continue;
                     operands.push_back(op);
                 }
                 IRBuilder<> builder(call);
-                for (auto &slot: slots) {
+                for (auto &slot : slots) {
                     if (!slot.isref)
                         continue;
                     operands.push_back(builder.CreateLoad(pass.T_prjlvalue, slot.slot));
@@ -1437,7 +1433,7 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
             push_frame(user, offset);
         }
         else if (auto gep = dyn_cast<GetElementPtrInst>(user)) {
-            APInt apoffset(sizeof(void*) * 8, offset, true);
+            APInt apoffset(sizeof(void *) * 8, offset, true);
             gep->accumulateConstantOffset(*pass.DL, apoffset);
             push_frame(gep, apoffset.getLimitedValue());
         }
@@ -1457,7 +1453,7 @@ void Optimizer::splitOnStack(CallInst *orig_inst)
         }
     }
 cleanup:
-    for (auto &slot: slots) {
+    for (auto &slot : slots) {
         if (!slot.isref)
             continue;
         PromoteMemToReg({slot.slot}, getDomTree());
@@ -1485,11 +1481,11 @@ bool AllocOpt::doInitialization(Module &M)
     T_int8 = Type::getInt8Ty(*ctx);
     T_int32 = Type::getInt32Ty(*ctx);
     T_int64 = Type::getInt64Ty(*ctx);
-    T_size = sizeof(void*) == 8 ? T_int64 : T_int32;
+    T_size = sizeof(void *) == 8 ? T_int64 : T_int32;
     T_pint8 = PointerType::get(T_int8, 0);
 
-    lifetime_start = Intrinsic::getDeclaration(&M, Intrinsic::lifetime_start, { T_pint8 });
-    lifetime_end = Intrinsic::getDeclaration(&M, Intrinsic::lifetime_end, { T_pint8 });
+    lifetime_start = Intrinsic::getDeclaration(&M, Intrinsic::lifetime_start, {T_pint8});
+    lifetime_end = Intrinsic::getDeclaration(&M, Intrinsic::lifetime_end, {T_pint8});
 
     MDNode *tbaa_data;
     MDNode *tbaa_data_scalar;
@@ -1511,8 +1507,7 @@ bool AllocOpt::runOnFunction(Function &F)
 
 char AllocOpt::ID = 0;
 static RegisterPass<AllocOpt> X("AllocOpt", "Promote heap allocation to stack",
-                                false /* Only looks at CFG */,
-                                false /* Analysis Pass */);
+                                false /* Only looks at CFG */, false /* Analysis Pass */);
 
 }
 

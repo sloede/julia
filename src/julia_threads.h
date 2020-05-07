@@ -25,12 +25,10 @@
 #define JL_HAVE_UCONTEXT
 typedef win32_ucontext_t jl_ucontext_t;
 #else
-#if !defined(JL_HAVE_UCONTEXT) && \
-    !defined(JL_HAVE_ASM) && \
-    !defined(JL_HAVE_UNW_CONTEXT) && \
-    !defined(JL_HAVE_SIGALTSTACK) && \
+#if !defined(JL_HAVE_UCONTEXT) && !defined(JL_HAVE_ASM) &&            \
+    !defined(JL_HAVE_UNW_CONTEXT) && !defined(JL_HAVE_SIGALTSTACK) && \
     !defined(JL_HAVE_ASYNCIFY)
-#if (defined(_CPU_X86_64_) || defined(_CPU_X86_) || defined(_CPU_AARCH64_) ||  \
+#if (defined(_CPU_X86_64_) || defined(_CPU_X86_) || defined(_CPU_AARCH64_) || \
      defined(_CPU_ARM_) || defined(_CPU_PPC64_))
 #define JL_HAVE_ASM
 #elif defined(_OS_DARWIN_)
@@ -74,19 +72,19 @@ typedef struct {
 } jl_mutex_t;
 
 typedef struct {
-    jl_taggedvalue_t *freelist;   // root of list of free objects
-    jl_taggedvalue_t *newpages;   // root of list of chunks of free objects
-    uint16_t osize;      // size of objects in this pool
+    jl_taggedvalue_t *freelist; // root of list of free objects
+    jl_taggedvalue_t *newpages; // root of list of chunks of free objects
+    uint16_t osize; // size of objects in this pool
 } jl_gc_pool_t;
 
 typedef struct {
-    int64_t     allocd;
-    int64_t     freed;
-    uint64_t    malloc;
-    uint64_t    realloc;
-    uint64_t    poolalloc;
-    uint64_t    bigalloc;
-    uint64_t    freecall;
+    int64_t allocd;
+    int64_t freed;
+    uint64_t malloc;
+    uint64_t realloc;
+    uint64_t poolalloc;
+    uint64_t bigalloc;
+    uint64_t freecall;
 } jl_thread_gc_num_t;
 
 typedef struct {
@@ -113,11 +111,11 @@ typedef struct {
 
     // variables for allocating objects from pools
 #ifdef _P64
-#  define JL_GC_N_POOLS 41
+#define JL_GC_N_POOLS 41
 #elif MAX_ALIGN == 8
-#  define JL_GC_N_POOLS 42
+#define JL_GC_N_POOLS 42
 #else
-#  define JL_GC_N_POOLS 43
+#define JL_GC_N_POOLS 43
 #endif
     jl_gc_pool_t norm_pools[JL_GC_N_POOLS];
 
@@ -198,7 +196,7 @@ struct _jl_tls_states_t {
     struct _jl_value_t *sig_exception;
     // Temporary backtrace buffer. Scanned for gc roots when bt_size > 0.
     struct _jl_bt_element_t *bt_data; // JL_MAX_BT_SIZE + 1 elements long
-    size_t bt_size;    // Size for backtrace in transit in bt_data
+    size_t bt_size; // Size for backtrace in transit in bt_data
     // Atomically set by the sender, reset by the handler.
     volatile sig_atomic_t signal_request;
     // Allow the sigint to be raised asynchronously
@@ -226,66 +224,63 @@ struct _jl_tls_states_t {
     // Access via jl_exception_occurred().
     struct _jl_value_t *previous_exception;
 
-    JULIA_DEBUG_SLEEPWAKE(
-        uint64_t uv_run_enter;
-        uint64_t uv_run_leave;
-        uint64_t sleep_enter;
-        uint64_t sleep_leave;
-    )
+    JULIA_DEBUG_SLEEPWAKE(uint64_t uv_run_enter; uint64_t uv_run_leave;
+                          uint64_t sleep_enter; uint64_t sleep_leave;)
 };
 
 // Update codegen version in `ccall.cpp` after changing either `pause` or `wake`
 #ifdef __MIC__
-#  define jl_cpu_pause() _mm_delay_64(100)
-#  define jl_cpu_wake() ((void)0)
-#  define JL_CPU_WAKE_NOOP 1
-#elif defined(_CPU_X86_64_) || defined(_CPU_X86_)  /* !__MIC__ */
-#  define jl_cpu_pause() _mm_pause()
-#  define jl_cpu_wake() ((void)0)
-#  define JL_CPU_WAKE_NOOP 1
+#define jl_cpu_pause() _mm_delay_64(100)
+#define jl_cpu_wake() ((void)0)
+#define JL_CPU_WAKE_NOOP 1
+#elif defined(_CPU_X86_64_) || defined(_CPU_X86_) /* !__MIC__ */
+#define jl_cpu_pause() _mm_pause()
+#define jl_cpu_wake() ((void)0)
+#define JL_CPU_WAKE_NOOP 1
 #elif defined(_CPU_AARCH64_) || (defined(_CPU_ARM_) && __ARM_ARCH >= 7)
-#  define jl_cpu_pause() __asm__ volatile ("wfe" ::: "memory")
-#  define jl_cpu_wake() __asm__ volatile ("sev" ::: "memory")
-#  define JL_CPU_WAKE_NOOP 0
+#define jl_cpu_pause() __asm__ volatile("wfe" ::: "memory")
+#define jl_cpu_wake() __asm__ volatile("sev" ::: "memory")
+#define JL_CPU_WAKE_NOOP 0
 #else
-#  define jl_cpu_pause() ((void)0)
-#  define jl_cpu_wake() ((void)0)
-#  define JL_CPU_WAKE_NOOP 1
+#define jl_cpu_pause() ((void)0)
+#define jl_cpu_wake() ((void)0)
+#define JL_CPU_WAKE_NOOP 1
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-JL_DLLEXPORT void (jl_cpu_pause)(void);
-JL_DLLEXPORT void (jl_cpu_wake)(void);
+JL_DLLEXPORT void(jl_cpu_pause)(void);
+JL_DLLEXPORT void(jl_cpu_wake)(void);
 
 // gc safepoint and gc states
 // This triggers a SegFault when we are in GC
 // Assign it to a variable to make sure the compiler emit the load
 // and to avoid Clang warning for -Wunused-volatile-lvalue
-#define jl_gc_safepoint_(ptls) do {                     \
-        jl_signal_fence();                              \
-        size_t safepoint_load = *ptls->safepoint;       \
-        jl_signal_fence();                              \
-        (void)safepoint_load;                           \
+#define jl_gc_safepoint_(ptls)                    \
+    do {                                          \
+        jl_signal_fence();                        \
+        size_t safepoint_load = *ptls->safepoint; \
+        jl_signal_fence();                        \
+        (void)safepoint_load;                     \
     } while (0)
 #ifdef __clang_analyzer__
 // This is a sigint safepoint, not a GC safepoint (which
 // JL_NOTSAFEPOINT refers to)
 void jl_sigint_safepoint(jl_ptls_t tls) JL_NOTSAFEPOINT;
 #else
-#define jl_sigint_safepoint(ptls) do {                  \
-        jl_signal_fence();                              \
-        size_t safepoint_load = ptls->safepoint[-1];    \
-        jl_signal_fence();                              \
-        (void)safepoint_load;                           \
+#define jl_sigint_safepoint(ptls)                    \
+    do {                                             \
+        jl_signal_fence();                           \
+        size_t safepoint_load = ptls->safepoint[-1]; \
+        jl_signal_fence();                           \
+        (void)safepoint_load;                        \
     } while (0)
 #endif
 // Make sure jl_gc_state() is always a rvalue
 #define jl_gc_state(ptls) ((int8_t)ptls->gc_state)
-STATIC_INLINE int8_t jl_gc_state_set(jl_ptls_t ptls, int8_t state,
-                                     int8_t old_state)
+STATIC_INLINE int8_t jl_gc_state_set(jl_ptls_t ptls, int8_t state, int8_t old_state)
 {
     ptls->gc_state = state;
     // A safe point is required if we transition from GC-safe region to
@@ -294,8 +289,7 @@ STATIC_INLINE int8_t jl_gc_state_set(jl_ptls_t ptls, int8_t state,
         jl_gc_safepoint_(ptls);
     return old_state;
 }
-STATIC_INLINE int8_t jl_gc_state_save_and_set(jl_ptls_t ptls,
-                                              int8_t state)
+STATIC_INLINE int8_t jl_gc_state_save_and_set(jl_ptls_t ptls, int8_t state)
 {
     return jl_gc_state_set(ptls, state, jl_gc_state(ptls));
 }
@@ -308,9 +302,10 @@ int8_t jl_gc_safe_leave(jl_ptls_t ptls, int8_t state); // Can be a safepoint
 #define jl_gc_unsafe_enter(ptls) jl_gc_state_save_and_set(ptls, 0)
 #define jl_gc_unsafe_leave(ptls, state) ((void)jl_gc_state_set(ptls, (state), 0))
 #define jl_gc_safe_enter(ptls) jl_gc_state_save_and_set(ptls, JL_GC_STATE_SAFE)
-#define jl_gc_safe_leave(ptls, state) ((void)jl_gc_state_set(ptls, (state), JL_GC_STATE_SAFE))
+#define jl_gc_safe_leave(ptls, state) \
+    ((void)jl_gc_state_set(ptls, (state), JL_GC_STATE_SAFE))
 #endif
-JL_DLLEXPORT void (jl_gc_safepoint)(void);
+JL_DLLEXPORT void(jl_gc_safepoint)(void);
 
 JL_DLLEXPORT void jl_gc_enable_finalizers(jl_ptls_t ptls, int on);
 

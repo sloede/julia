@@ -27,8 +27,7 @@ static inline void jl_mutex_wait(jl_mutex_t *lock, int safepoint)
         return;
     }
     while (1) {
-        if (owner == 0 &&
-            jl_atomic_compare_exchange(&lock->owner, 0, self) == 0) {
+        if (owner == 0 && jl_atomic_compare_exchange(&lock->owner, 0, self) == 0) {
             lock->count = 1;
             return;
         }
@@ -65,7 +64,7 @@ static inline void jl_lock_frame_push(jl_mutex_t *lock)
     else {
         locks->len = len + 1;
     }
-    locks->items[len] = (void*)lock;
+    locks->items[len] = (void *)lock;
 }
 static inline void jl_lock_frame_pop(void)
 {
@@ -75,15 +74,17 @@ static inline void jl_lock_frame_pop(void)
     }
 }
 
-#define JL_SIGATOMIC_BEGIN() do {               \
-        jl_get_ptls_states()->defer_signal++;   \
-        jl_signal_fence();                      \
+#define JL_SIGATOMIC_BEGIN()                  \
+    do {                                      \
+        jl_get_ptls_states()->defer_signal++; \
+        jl_signal_fence();                    \
     } while (0)
-#define JL_SIGATOMIC_END() do {                                 \
-        jl_signal_fence();                                      \
-        if (--jl_get_ptls_states()->defer_signal == 0) {        \
-            jl_sigint_safepoint(jl_get_ptls_states());          \
-        }                                                       \
+#define JL_SIGATOMIC_END()                               \
+    do {                                                 \
+        jl_signal_fence();                               \
+        if (--jl_get_ptls_states()->defer_signal == 0) { \
+            jl_sigint_safepoint(jl_get_ptls_states());   \
+        }                                                \
     } while (0)
 
 static inline void jl_mutex_lock(jl_mutex_t *lock)
@@ -103,8 +104,7 @@ static inline int jl_mutex_trylock_nogc(jl_mutex_t *lock)
         lock->count++;
         return 1;
     }
-    if (owner == 0 &&
-        jl_atomic_compare_exchange(&lock->owner, 0, self) == 0) {
+    if (owner == 0 && jl_atomic_compare_exchange(&lock->owner, 0, self) == 0) {
         lock->count = 1;
         return 1;
     }
@@ -125,8 +125,7 @@ static inline int jl_mutex_trylock(jl_mutex_t *lock)
 static inline void jl_mutex_unlock_nogc(jl_mutex_t *lock) JL_NOTSAFEPOINT
 {
 #ifndef __clang_analyzer__
-    assert(lock->owner == jl_thread_self() &&
-           "Unlocking a lock in a different thread.");
+    assert(lock->owner == jl_thread_self() && "Unlocking a lock in a different thread.");
     if (--lock->count == 0) {
         jl_atomic_store_release(&lock->owner, 0);
         jl_cpu_wake();

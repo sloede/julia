@@ -1,11 +1,11 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <string.h>
-#include <assert.h>
-#include <sys/types.h>
 #include "flisp.h"
 #include "utf8proc.h"
+#include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,26 +20,25 @@ void print_iostream(fl_context_t *fl_ctx, value_t v, ios_t *f)
 void free_iostream(fl_context_t *fl_ctx, value_t self)
 {
     (void)fl_ctx;
-    ios_t *s = value2c(ios_t*, self);
+    ios_t *s = value2c(ios_t *, self);
     ios_close(s);
 }
 
 void relocate_iostream(fl_context_t *fl_ctx, value_t oldv, value_t newv)
 {
     (void)fl_ctx;
-    ios_t *olds = value2c(ios_t*, oldv);
-    ios_t *news = value2c(ios_t*, newv);
+    ios_t *olds = value2c(ios_t *, oldv);
+    ios_t *news = value2c(ios_t *, newv);
     if (news->buf == &olds->local[0]) {
         news->buf = &news->local[0];
     }
 }
 
-const cvtable_t iostream_vtable = { print_iostream, relocate_iostream,
-                                    free_iostream, NULL };
+const cvtable_t iostream_vtable = {print_iostream, relocate_iostream, free_iostream, NULL};
 
 int fl_isiostream(fl_context_t *fl_ctx, value_t v)
 {
-    return iscvalue(v) && cv_class((cvalue_t*)ptr(v)) == fl_ctx->iostreamtype;
+    return iscvalue(v) && cv_class((cvalue_t *)ptr(v)) == fl_ctx->iostreamtype;
 }
 
 value_t fl_iostreamp(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
@@ -65,7 +64,7 @@ static ios_t *toiostream(fl_context_t *fl_ctx, value_t v, const char *fname)
 {
     if (!fl_isiostream(fl_ctx, v))
         type_error(fl_ctx, fname, "iostream", v);
-    return value2c(ios_t*, v);
+    return value2c(ios_t *, v);
 }
 
 ios_t *fl_toiostream(fl_context_t *fl_ctx, value_t v, const char *fname)
@@ -77,21 +76,34 @@ value_t fl_file(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     if (nargs < 1)
         argcount(fl_ctx, "file", nargs, 1);
-    int i, r=0, w=0, c=0, t=0, a=0;
-    for(i=1; i < (int)nargs; i++) {
-        if      (args[i] == fl_ctx->wrsym)    w = 1;
-        else if (args[i] == fl_ctx->apsym)    { a = 1; w = 1; }
-        else if (args[i] == fl_ctx->crsym)    { c = 1; w = 1; }
-        else if (args[i] == fl_ctx->truncsym) { t = 1; w = 1; }
-        else if (args[i] == fl_ctx->rdsym)    r = 1;
+    int i, r = 0, w = 0, c = 0, t = 0, a = 0;
+    for (i = 1; i < (int)nargs; i++) {
+        if (args[i] == fl_ctx->wrsym)
+            w = 1;
+        else if (args[i] == fl_ctx->apsym) {
+            a = 1;
+            w = 1;
+        }
+        else if (args[i] == fl_ctx->crsym) {
+            c = 1;
+            w = 1;
+        }
+        else if (args[i] == fl_ctx->truncsym) {
+            t = 1;
+            w = 1;
+        }
+        else if (args[i] == fl_ctx->rdsym)
+            r = 1;
     }
-    if ((r|w|c|t|a) == 0) r = 1;  // default to reading
+    if ((r | w | c | t | a) == 0)
+        r = 1; // default to reading
     value_t f = cvalue(fl_ctx, fl_ctx->iostreamtype, sizeof(ios_t));
     char *fname = tostring(fl_ctx, args[0], "file");
-    ios_t *s = value2c(ios_t*, f);
+    ios_t *s = value2c(ios_t *, f);
     if (ios_file(s, fname, r, w, c, t) == NULL)
         lerrorf(fl_ctx, fl_ctx->IOError, "file: could not open \"%s\"", fname);
-    if (a) ios_seek_end(s);
+    if (a)
+        ios_seek_end(s);
     return f;
 }
 
@@ -100,7 +112,7 @@ value_t fl_buffer(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     argcount(fl_ctx, "buffer", nargs, 0);
     (void)args;
     value_t f = cvalue(fl_ctx, fl_ctx->iostreamtype, sizeof(ios_t));
-    ios_t *s = value2c(ios_t*, f);
+    ios_t *s = value2c(ios_t *, f);
     if (ios_mem(s, 0) == NULL)
         lerror(fl_ctx, fl_ctx->OutOfMemoryError, "buffer: could not allocate stream");
     return f;
@@ -122,7 +134,7 @@ value_t fl_read(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     fl_gc_handle(fl_ctx, &arg);
     value_t v = fl_read_sexpr(fl_ctx, arg);
     fl_free_gc_handles(fl_ctx, 1);
-    if (ios_eof(value2c(ios_t*,arg)))
+    if (ios_eof(value2c(ios_t *, arg)))
         return fl_ctx->FL_EOF;
     return v;
 }
@@ -134,7 +146,7 @@ value_t fl_iogetc(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     uint32_t wc;
     int result = ios_getutf8(s, &wc);
     if (result == IOS_EOF)
-        //lerror(fl_ctx, IOError, "io.getc: end of file reached");
+        // lerror(fl_ctx, IOError, "io.getc: end of file reached");
         return fl_ctx->FL_EOF;
     if (result == 0)
         lerror(fl_ctx, fl_ctx->IOError, "invalid UTF-8 sequence");
@@ -158,9 +170,9 @@ value_t fl_ioputc(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "io.putc", nargs, 2);
     ios_t *s = toiostream(fl_ctx, args[0], "io.putc");
-    if (!iscprim(args[1]) || ((cprim_t*)ptr(args[1]))->type != fl_ctx->wchartype)
+    if (!iscprim(args[1]) || ((cprim_t *)ptr(args[1]))->type != fl_ctx->wchartype)
         type_error(fl_ctx, "io.putc", "wchar", args[1]);
-    uint32_t wc = *(uint32_t*)cp_data((cprim_t*)ptr(args[1]));
+    uint32_t wc = *(uint32_t *)cp_data((cprim_t *)ptr(args[1]));
     return fixnum(ios_pututf8(s, wc));
 }
 
@@ -168,14 +180,14 @@ value_t fl_ioungetc(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "io.ungetc", nargs, 2);
     ios_t *s = toiostream(fl_ctx, args[0], "io.ungetc");
-    if (!iscprim(args[1]) || ((cprim_t*)ptr(args[1]))->type != fl_ctx->wchartype)
+    if (!iscprim(args[1]) || ((cprim_t *)ptr(args[1]))->type != fl_ctx->wchartype)
         type_error(fl_ctx, "io.ungetc", "wchar", args[1]);
-    uint32_t wc = *(uint32_t*)cp_data((cprim_t*)ptr(args[1]));
+    uint32_t wc = *(uint32_t *)cp_data((cprim_t *)ptr(args[1]));
     if (wc >= 0x80) {
         lerror(fl_ctx, fl_ctx->ArgError, "io_ungetc: unicode not yet supported");
     }
     s->u_colno -= utf8proc_charwidth(wc);
-    return fixnum(ios_ungetc((int)wc,s));
+    return fixnum(ios_ungetc((int)wc, s));
 }
 
 value_t fl_ioflush(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
@@ -278,18 +290,20 @@ value_t fl_ioread(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     }
     value_t cv = cvalue(fl_ctx, ft, n);
     char *data;
-    if (iscvalue(cv)) data = (char*)cv_data((cvalue_t*)ptr(cv));
-    else data = cp_data((cprim_t*)ptr(cv));
-    size_t got = ios_read(value2c(ios_t*,args[0]), data, n);
+    if (iscvalue(cv))
+        data = (char *)cv_data((cvalue_t *)ptr(cv));
+    else
+        data = cp_data((cprim_t *)ptr(cv));
+    size_t got = ios_read(value2c(ios_t *, args[0]), data, n);
     if (got < n)
-        //lerror(fl_ctx, IOError, "io.read: end of input reached");
+        // lerror(fl_ctx, IOError, "io.read: end of input reached");
         return fl_ctx->FL_EOF;
     return cv;
 }
 
 // args must contain data[, offset[, count]]
-static void get_start_count_args(fl_context_t *fl_ctx, value_t *args, uint32_t nargs, size_t sz,
-                                 size_t *offs, size_t *nb, char *fname)
+static void get_start_count_args(fl_context_t *fl_ctx, value_t *args, uint32_t nargs,
+                                 size_t sz, size_t *offs, size_t *nb, char *fname)
 {
     if (nargs > 1) {
         *offs = tosize(fl_ctx, args[1], fname);
@@ -307,19 +321,19 @@ value_t fl_iowrite(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     if (nargs < 2 || nargs > 4)
         argcount(fl_ctx, "io.write", nargs, 2);
     ios_t *s = toiostream(fl_ctx, args[0], "io.write");
-    if (iscprim(args[1]) && ((cprim_t*)ptr(args[1]))->type == fl_ctx->wchartype) {
+    if (iscprim(args[1]) && ((cprim_t *)ptr(args[1]))->type == fl_ctx->wchartype) {
         if (nargs > 2)
             lerror(fl_ctx, fl_ctx->ArgError,
                    "io.write: offset argument not supported for characters");
-        uint32_t wc = *(uint32_t*)cp_data((cprim_t*)ptr(args[1]));
+        uint32_t wc = *(uint32_t *)cp_data((cprim_t *)ptr(args[1]));
         return fixnum(ios_pututf8(s, wc));
     }
     char *data;
-    size_t sz, offs=0;
+    size_t sz, offs = 0;
     to_sized_ptr(fl_ctx, args[1], "io.write", &data, &sz);
     size_t nb = sz;
     if (nargs > 2) {
-        get_start_count_args(fl_ctx, &args[1], nargs-1, sz, &offs, &nb, "io.write");
+        get_start_count_args(fl_ctx, &args[1], nargs - 1, sz, &offs, &nb, "io.write");
         data += offs;
     }
     return size_wrap(fl_ctx, ios_write(s, data, nb));
@@ -330,7 +344,7 @@ static char get_delim_arg(fl_context_t *fl_ctx, value_t arg, char *fname)
     size_t uldelim = tosize(fl_ctx, arg, fname);
     if (uldelim > 0x7f) {
         // wchars > 0x7f, or anything else > 0xff, are out of range
-        if ((iscprim(arg) && cp_class((cprim_t*)ptr(arg))==fl_ctx->wchartype) ||
+        if ((iscprim(arg) && cp_class((cprim_t *)ptr(arg)) == fl_ctx->wchartype) ||
             uldelim > 0xff)
             lerrorf(fl_ctx, fl_ctx->ArgError, "%s: delimiter out of range", fname);
     }
@@ -341,8 +355,8 @@ value_t fl_ioreaduntil(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
 {
     argcount(fl_ctx, "io.readuntil", nargs, 2);
     value_t str = cvalue_string(fl_ctx, 80);
-    cvalue_t *cv = (cvalue_t*)ptr(str);
-    char *data = (char*)cv_data(cv);
+    cvalue_t *cv = (cvalue_t *)ptr(str);
+    char *data = (char *)cv_data(cv);
     ios_t dest;
     ios_mem(&dest, 0);
     ios_setbuf(&dest, data, 80, 0);
@@ -357,7 +371,7 @@ value_t fl_ioreaduntil(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
         cv_autorelease(fl_ctx, cv);
     }
     else {
-        ((char*)cv->data)[n] = '\0';
+        ((char *)cv->data)[n] = '\0';
     }
     if (n == 0 && ios_eof(src))
         return fl_ctx->FL_EOF;
@@ -390,19 +404,20 @@ value_t stream_to_string(fl_context_t *fl_ctx, value_t *ps)
 {
     value_t str;
     size_t n;
-    ios_t *st = value2c(ios_t*,*ps);
+    ios_t *st = value2c(ios_t *, *ps);
     if (st->buf == &st->local[0]) {
         n = (size_t)st->size;
         str = cvalue_string(fl_ctx, n);
-        st = value2c(ios_t*,*ps); // reload after allocating str
+        st = value2c(ios_t *, *ps); // reload after allocating str
         memcpy(cvalue_data(str), st->buf, n);
         ios_trunc(st, 0);
     }
     else {
-        char *b = ios_take_buffer(st, &n); n--;
+        char *b = ios_take_buffer(st, &n);
+        n--;
         b[n] = '\0';
         str = cvalue_from_ref(fl_ctx, fl_ctx->stringtype, b, n, fl_ctx->NIL);
-        cv_autorelease(fl_ctx, (cvalue_t*)ptr(str));
+        cv_autorelease(fl_ctx, (cvalue_t *)ptr(str));
     }
     return str;
 }
@@ -416,35 +431,33 @@ value_t fl_iotostring(fl_context_t *fl_ctx, value_t *args, uint32_t nargs)
     return stream_to_string(fl_ctx, &args[0]);
 }
 
-static const builtinspec_t iostreamfunc_info[] = {
-    { "iostream?", fl_iostreamp },
-    { "eof-object", fl_eof_object },
-    { "eof-object?", fl_eof_objectp },
-    { "file", fl_file },
-    { "buffer", fl_buffer },
-    { "read", fl_read },
-    { "write", fl_write },
-    { "io.flush", fl_ioflush },
-    { "io.close", fl_ioclose },
-    { "io.eof?" , fl_ioeof },
-    { "io.seek" , fl_ioseek },
-    { "io.pos",   fl_iopos },
-    { "io.getc" , fl_iogetc },
-    { "io.ungetc", fl_ioungetc },
-    { "io.putc" , fl_ioputc },
-    { "io.peekc" , fl_iopeekc },
-    { "io.discardbuffer", fl_iopurge },
-    { "io.read", fl_ioread },
-    { "io.write", fl_iowrite },
-    { "io.copy", fl_iocopy },
-    { "io.readuntil", fl_ioreaduntil },
-    { "io.copyuntil", fl_iocopyuntil },
-    { "io.tostring!", fl_iotostring },
-    { "input-port-line", fl_iolineno },
-    { "input-port-column", fl_iocolno },
+static const builtinspec_t iostreamfunc_info[] = {{"iostream?", fl_iostreamp},
+                                                  {"eof-object", fl_eof_object},
+                                                  {"eof-object?", fl_eof_objectp},
+                                                  {"file", fl_file},
+                                                  {"buffer", fl_buffer},
+                                                  {"read", fl_read},
+                                                  {"write", fl_write},
+                                                  {"io.flush", fl_ioflush},
+                                                  {"io.close", fl_ioclose},
+                                                  {"io.eof?", fl_ioeof},
+                                                  {"io.seek", fl_ioseek},
+                                                  {"io.pos", fl_iopos},
+                                                  {"io.getc", fl_iogetc},
+                                                  {"io.ungetc", fl_ioungetc},
+                                                  {"io.putc", fl_ioputc},
+                                                  {"io.peekc", fl_iopeekc},
+                                                  {"io.discardbuffer", fl_iopurge},
+                                                  {"io.read", fl_ioread},
+                                                  {"io.write", fl_iowrite},
+                                                  {"io.copy", fl_iocopy},
+                                                  {"io.readuntil", fl_ioreaduntil},
+                                                  {"io.copyuntil", fl_iocopyuntil},
+                                                  {"io.tostring!", fl_iotostring},
+                                                  {"input-port-line", fl_iolineno},
+                                                  {"input-port-column", fl_iocolno},
 
-    { NULL, NULL }
-};
+                                                  {NULL, NULL}};
 
 void iostream_init(fl_context_t *fl_ctx)
 {
@@ -456,16 +469,18 @@ void iostream_init(fl_context_t *fl_ctx)
     fl_ctx->truncsym = symbol(fl_ctx, ":truncate");
     fl_ctx->instrsym = symbol(fl_ctx, "*input-stream*");
     fl_ctx->outstrsym = symbol(fl_ctx, "*output-stream*");
-    fl_ctx->iostreamtype = define_opaque_type(fl_ctx->iostreamsym, sizeof(ios_t),
-                                              &iostream_vtable, NULL);
+    fl_ctx->iostreamtype =
+        define_opaque_type(fl_ctx->iostreamsym, sizeof(ios_t), &iostream_vtable, NULL);
     assign_global_builtins(fl_ctx, iostreamfunc_info);
 
-    setc(symbol(fl_ctx, "*stdout*"), cvalue_from_ref(fl_ctx, fl_ctx->iostreamtype, ios_stdout,
-                                                     sizeof(ios_t), fl_ctx->NIL));
-    setc(symbol(fl_ctx, "*stderr*"), cvalue_from_ref(fl_ctx, fl_ctx->iostreamtype, ios_stderr,
-                                                     sizeof(ios_t), fl_ctx->NIL));
-    setc(symbol(fl_ctx, "*stdin*" ), cvalue_from_ref(fl_ctx, fl_ctx->iostreamtype, ios_stdin,
-                                                     sizeof(ios_t), fl_ctx->NIL));
+    setc(symbol(fl_ctx, "*stdout*"),
+         cvalue_from_ref(fl_ctx, fl_ctx->iostreamtype, ios_stdout, sizeof(ios_t),
+                         fl_ctx->NIL));
+    setc(symbol(fl_ctx, "*stderr*"),
+         cvalue_from_ref(fl_ctx, fl_ctx->iostreamtype, ios_stderr, sizeof(ios_t),
+                         fl_ctx->NIL));
+    setc(symbol(fl_ctx, "*stdin*"), cvalue_from_ref(fl_ctx, fl_ctx->iostreamtype, ios_stdin,
+                                                    sizeof(ios_t), fl_ctx->NIL));
 }
 
 #ifdef __cplusplus

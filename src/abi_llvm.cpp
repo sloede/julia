@@ -39,20 +39,9 @@
 //===----------------------------------------------------------------------===//
 
 struct ABI_LLVMLayout : AbiLayout {
+    bool use_sret(jl_datatype_t *ty) override { return false; }
 
-bool use_sret(jl_datatype_t *ty) override
-{
-    return false;
-}
+    bool needPassByRef(jl_datatype_t *ty, AttrBuilder &ab) override { return false; }
 
-bool needPassByRef(jl_datatype_t *ty, AttrBuilder &ab) override
-{
-    return false;
-}
-
-Type *preferred_llvm_type(jl_datatype_t *ty, bool isret) const override
-{
-    return NULL;
-}
-
+    Type *preferred_llvm_type(jl_datatype_t *ty, bool isret) const override { return NULL; }
 };

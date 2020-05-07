@@ -30,9 +30,9 @@ JL_DLLEXPORT void jl_gc_set_cb_task_scanner(jl_gc_cb_task_scanner_t cb, int enab
 JL_DLLEXPORT void jl_gc_set_cb_pre_gc(jl_gc_cb_pre_gc_t cb, int enable);
 JL_DLLEXPORT void jl_gc_set_cb_post_gc(jl_gc_cb_post_gc_t cb, int enable);
 JL_DLLEXPORT void jl_gc_set_cb_notify_external_alloc(jl_gc_cb_notify_external_alloc_t cb,
-        int enable);
+                                                     int enable);
 JL_DLLEXPORT void jl_gc_set_cb_notify_external_free(jl_gc_cb_notify_external_free_t cb,
-        int enable);
+                                                    int enable);
 
 // Types for custom mark and sweep functions.
 typedef uintptr_t (*jl_markfunc_t)(jl_ptls_t, jl_value_t *obj);
@@ -40,14 +40,11 @@ typedef void (*jl_sweepfunc_t)(jl_value_t *obj);
 
 // Function to create a new foreign type with custom
 // mark and sweep functions.
-JL_DLLEXPORT jl_datatype_t *jl_new_foreign_type(
-        jl_sym_t *name,
-        jl_module_t *module,
-        jl_datatype_t *super,
-        jl_markfunc_t markfunc,
-        jl_sweepfunc_t sweepfunc,
-        int haspointers,
-        int large);
+JL_DLLEXPORT jl_datatype_t *jl_new_foreign_type(jl_sym_t *name, jl_module_t *module,
+                                                jl_datatype_t *super,
+                                                jl_markfunc_t markfunc,
+                                                jl_sweepfunc_t sweepfunc, int haspointers,
+                                                int large);
 
 JL_DLLEXPORT size_t jl_gc_max_internal_obj_size(void);
 JL_DLLEXPORT size_t jl_gc_external_obj_hdr_size(void);
@@ -69,7 +66,7 @@ JL_DLLEXPORT void *jl_gc_alloc_typed(jl_ptls_t ptls, size_t sz, void *ty);
 // or from within a custom mark function.
 JL_DLLEXPORT int jl_gc_mark_queue_obj(jl_ptls_t ptls, jl_value_t *obj);
 JL_DLLEXPORT void jl_gc_mark_queue_objarray(jl_ptls_t ptls, jl_value_t *parent,
-    jl_value_t **objs, size_t nobjs);
+                                            jl_value_t **objs, size_t nobjs);
 
 // Sweep functions will not automatically be called for objects of
 // foreign types, as that may not always be desired. Only calling
@@ -77,7 +74,7 @@ JL_DLLEXPORT void jl_gc_mark_queue_objarray(jl_ptls_t ptls, jl_value_t *parent,
 // will result in the custome sweep function actually being called.
 // This must be done at most once per object and should usually be
 // done right after allocating the object.
-JL_DLLEXPORT void jl_gc_schedule_foreign_sweepfunc(jl_ptls_t ptls, jl_value_t * bj);
+JL_DLLEXPORT void jl_gc_schedule_foreign_sweepfunc(jl_ptls_t ptls, jl_value_t *bj);
 
 // The following functions enable support for conservative marking. This
 // functionality allows the user to determine if a machine word can be

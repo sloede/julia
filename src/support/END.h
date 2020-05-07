@@ -34,7 +34,7 @@
  */
 
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__ELF__)
-.size CNAME, . - CNAME
+.size CNAME, .- CNAME
 #else
 #ifdef _MSC_VER
 CNAME endp

@@ -3,7 +3,8 @@
 #ifndef JL_OPTIONS_H
 #define JL_OPTIONS_H
 
-// Options in here are NOT allowed to affect the jlapi, since that would require this header to be installed
+// Options in here are NOT allowed to affect the jlapi, since that would require this header
+// to be installed
 
 // Build-time options for debugging, tweaking, and selecting alternative
 // implementations of core features.
@@ -14,7 +15,7 @@
 
 // how much space we're willing to waste if an array outgrows its
 // original object
-#define ARRAY_INLINE_NBYTES (2048*sizeof(void*))
+#define ARRAY_INLINE_NBYTES (2048 * sizeof(void *))
 
 // codegen options ------------------------------------------------------------
 
@@ -108,9 +109,9 @@
 // When not using COPY_STACKS the task-system is less memory efficient so
 // you probably want to choose a smaller default stack size (factor of 8-10)
 #ifdef _P64
-#define JL_STACK_SIZE (4*1024*1024)
+#define JL_STACK_SIZE (4 * 1024 * 1024)
 #else
-#define JL_STACK_SIZE (2*1024*1024)
+#define JL_STACK_SIZE (2 * 1024 * 1024)
 #endif
 
 // allow a suspended Task to restart on a different thread
@@ -119,37 +120,37 @@
 // threading options ----------------------------------------------------------
 
 // controls for when threads sleep
-#define THREAD_SLEEP_THRESHOLD_NAME     "JULIA_THREAD_SLEEP_THRESHOLD"
-#define DEFAULT_THREAD_SLEEP_THRESHOLD  4*1000*1000 // nanoseconds (4ms)
+#define THREAD_SLEEP_THRESHOLD_NAME "JULIA_THREAD_SLEEP_THRESHOLD"
+#define DEFAULT_THREAD_SLEEP_THRESHOLD 4 * 1000 * 1000 // nanoseconds (4ms)
 
 // defaults for # threads
-#define NUM_THREADS_NAME                "JULIA_NUM_THREADS"
+#define NUM_THREADS_NAME "JULIA_NUM_THREADS"
 #ifndef JULIA_NUM_THREADS
-#  define JULIA_NUM_THREADS 1
+#define JULIA_NUM_THREADS 1
 #endif
 
 // affinitization behavior
-#define MACHINE_EXCLUSIVE_NAME          "JULIA_EXCLUSIVE"
-#define DEFAULT_MACHINE_EXCLUSIVE       0
+#define MACHINE_EXCLUSIVE_NAME "JULIA_EXCLUSIVE"
+#define DEFAULT_MACHINE_EXCLUSIVE 0
 
 // partr -- parallel tasks runtime options ------------------------------------
 
 // multiq
-    // number of heaps = MULTIQ_HEAP_C * nthreads
-#define MULTIQ_HEAP_C                   4
-    // how many in each heap
-#define MULTIQ_TASKS_PER_HEAP           129
+// number of heaps = MULTIQ_HEAP_C * nthreads
+#define MULTIQ_HEAP_C 4
+// how many in each heap
+#define MULTIQ_TASKS_PER_HEAP 129
 
 // parfor
-    // tasks = niters / (GRAIN_K * nthreads)
-#define GRAIN_K                         4
+// tasks = niters / (GRAIN_K * nthreads)
+#define GRAIN_K 4
 
 // synchronization
-    // narrivers = ((GRAIN_K * nthreads) ^ ARRIVERS_P) + 1
-    // limit for number of recursive parfors
-#define ARRIVERS_P                      2
-    // nreducers = narrivers * REDUCERS_FRAC
-#define REDUCERS_FRAC                   1
+// narrivers = ((GRAIN_K * nthreads) ^ ARRIVERS_P) + 1
+// limit for number of recursive parfors
+#define ARRIVERS_P 2
+// nreducers = narrivers * REDUCERS_FRAC
+#define REDUCERS_FRAC 1
 
 
 // sanitizer defaults ---------------------------------------------------------

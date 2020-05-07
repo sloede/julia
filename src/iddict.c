@@ -50,7 +50,7 @@ static int jl_table_assign_bp(jl_array_t **pa, jl_value_t *key, jl_value_t *val)
         empty_slot = -1;
 
         do {
-            jl_value_t *k2 = (jl_value_t*)tab[index];
+            jl_value_t *k2 = (jl_value_t *)tab[index];
             if (k2 == NULL) {
                 if (empty_slot == -1)
                     empty_slot = index;
@@ -62,7 +62,8 @@ static int jl_table_assign_bp(jl_array_t **pa, jl_value_t *key, jl_value_t *val)
                     jl_gc_wb(a, val);
                     return 0;
                 }
-                // `nothing` is our sentinel value for deletion, so need to keep searching if it's also our search key
+                // `nothing` is our sentinel value for deletion, so need to keep searching
+                // if it's also our search key
                 assert(key == jl_nothing);
                 if (empty_slot == -1)
                     empty_slot = index;
@@ -118,13 +119,15 @@ jl_value_t **jl_table_peek_bp(jl_array_t *a, jl_value_t *key) JL_NOTSAFEPOINT
     size_t iter = 0;
 
     do {
-        jl_value_t *k2 = (jl_value_t*)jl_atomic_load_relaxed(&tab[index]); // just to ensure the load doesn't get duplicated
+        jl_value_t *k2 = (jl_value_t *)jl_atomic_load_relaxed(
+            &tab[index]); // just to ensure the load doesn't get duplicated
         if (k2 == NULL)
             return NULL;
         if (jl_egal(key, k2)) {
             if (tab[index + 1] != NULL)
-                return (jl_value_t**)&tab[index + 1];
-            // `nothing` is our sentinel value for deletion, so need to keep searching if it's also our search key
+                return (jl_value_t **)&tab[index + 1];
+            // `nothing` is our sentinel value for deletion, so need to keep searching if
+            // it's also our search key
             if (key != jl_nothing)
                 return NULL; // concurrent insertion hasn't completed yet
         }
@@ -151,7 +154,8 @@ jl_array_t *jl_eqtable_put(jl_array_t *h, jl_value_t *key, jl_value_t *val, int 
 // Note: lookup in the IdDict is permitted concurrently, if you avoid deletions,
 // and assuming you do use an external lock around all insertions
 JL_DLLEXPORT
-jl_value_t *jl_eqtable_get(jl_array_t *h, jl_value_t *key, jl_value_t *deflt) JL_NOTSAFEPOINT
+jl_value_t *jl_eqtable_get(jl_array_t *h, jl_value_t *key,
+                           jl_value_t *deflt) JL_NOTSAFEPOINT
 {
     jl_value_t **bp = jl_table_peek_bp(h, key);
     return (bp == NULL) ? deflt : *bp;

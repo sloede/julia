@@ -1,8 +1,8 @@
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 #include "flisp.h"
 #include "opcodes.h"
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,7 +10,8 @@ extern "C" {
 
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
-const char* __asan_default_options() {
+const char *__asan_default_options()
+{
     return "detect_leaks=0";
 }
 #endif
@@ -19,10 +20,10 @@ const char* __asan_default_options() {
 static value_t argv_list(fl_context_t *fl_ctx, int argc, char *argv[])
 {
     int i;
-    value_t lst=fl_ctx->NIL, temp;
+    value_t lst = fl_ctx->NIL, temp;
     fl_gc_handle(fl_ctx, &lst);
     fl_gc_handle(fl_ctx, &temp);
-    for(i=argc-1; i >= 0; i--) {
+    for (i = argc - 1; i >= 0; i--) {
         temp = cvalue_static_cstring(fl_ctx, argv[i]);
         lst = fl_cons(fl_ctx, temp, lst);
     }
@@ -39,11 +40,11 @@ int main(int argc, char *argv[])
     char fname_buf[1024];
     fl_context_t *fl_ctx = &fl_global_ctx;
 
-    fl_init(fl_ctx, 512*1024);
+    fl_init(fl_ctx, 512 * 1024);
 
     fname_buf[0] = '\0';
     value_t str = symbol_value(symbol(fl_ctx, "*install-dir*"));
-    char *exedir = (char*)(str == UNBOUND ? NULL : cvalue_data(str));
+    char *exedir = (char *)(str == UNBOUND ? NULL : cvalue_data(str));
     if (exedir != NULL) {
         strcat(fname_buf, exedir);
         strcat(fname_buf, PATHSEPSTRING);
@@ -53,7 +54,8 @@ int main(int argc, char *argv[])
     value_t args[2];
     fl_gc_handle(fl_ctx, &args[0]);
     fl_gc_handle(fl_ctx, &args[1]);
-    FL_TRY_EXTERN(fl_ctx) {
+    FL_TRY_EXTERN(fl_ctx)
+    {
         args[0] = cvalue_static_cstring(fl_ctx, fname_buf);
         args[1] = symbol(fl_ctx, ":read");
         value_t f = fl_file(fl_ctx, &args[0], 2);
@@ -65,7 +67,8 @@ int main(int argc, char *argv[])
         (void)fl_applyn(fl_ctx, 1, symbol_value(symbol(fl_ctx, "__start")),
                         argv_list(fl_ctx, argc, argv));
     }
-    FL_CATCH_EXTERN(fl_ctx) {
+    FL_CATCH_EXTERN(fl_ctx)
+    {
         ios_puts("fatal error:\n", ios_stderr);
         fl_print(fl_ctx, ios_stderr, fl_ctx->lasterror);
         ios_putc('\n', ios_stderr);

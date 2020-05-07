@@ -2,18 +2,18 @@
 
 // ARM (AArch32/AArch64) specific processor detection and dispatch
 
-#include <sys/stat.h>
-#include <sys/utsname.h>
+#include <algorithm>
 #include <fcntl.h>
+#include <fstream>
 #include <set>
 #include <sstream>
-#include <fstream>
-#include <algorithm>
+#include <sys/stat.h>
+#include <sys/utsname.h>
 
 #if defined(_CPU_AARCH64_) || __GLIBC_PREREQ(2, 16)
-#  include <sys/auxv.h>
+#include <sys/auxv.h>
 #else
-#  define DYN_GETAUXVAL
+#define DYN_GETAUXVAL
 #endif
 
 namespace ARM {
@@ -214,17 +214,22 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
     {"armv8.3_a", CPU::armv8_3_a, CPU::generic, 0, Feature::armv8_3a},
     {"cortex-a35", CPU::arm_cortex_a35, CPU::generic, 0, Feature::arm_cortex_a35},
     {"cortex-a53", CPU::arm_cortex_a53, CPU::generic, 0, Feature::arm_cortex_a53},
-    {"cortex-a55", CPU::arm_cortex_a55, CPU::arm_cortex_a53, UINT32_MAX, Feature::arm_cortex_a55},
+    {"cortex-a55", CPU::arm_cortex_a55, CPU::arm_cortex_a53, UINT32_MAX,
+     Feature::arm_cortex_a55},
     {"cortex-a57", CPU::arm_cortex_a57, CPU::generic, 0, Feature::arm_cortex_a57},
     {"cortex-a72", CPU::arm_cortex_a72, CPU::generic, 0, Feature::arm_cortex_a72},
     {"cortex-a73", CPU::arm_cortex_a73, CPU::generic, 0, Feature::arm_cortex_a73},
-    {"cortex-a75", CPU::arm_cortex_a75, CPU::arm_cortex_a73, UINT32_MAX, Feature::arm_cortex_a75},
+    {"cortex-a75", CPU::arm_cortex_a75, CPU::arm_cortex_a73, UINT32_MAX,
+     Feature::arm_cortex_a75},
     {"thunderx", CPU::cavium_thunderx, CPU::generic, 50000, Feature::cavium_thunderx},
-    {"thunderxt88", CPU::cavium_thunderx88, CPU::generic, 50000, Feature::cavium_thunderx88},
+    {"thunderxt88", CPU::cavium_thunderx88, CPU::generic, 50000,
+     Feature::cavium_thunderx88},
     {"thunderxt88p1", CPU::cavium_thunderx88p1, CPU::cavium_thunderx88, UINT32_MAX,
      Feature::cavium_thunderx88p1},
-    {"thunderxt81", CPU::cavium_thunderx81, CPU::generic, 50000, Feature::cavium_thunderx81},
-    {"thunderxt83", CPU::cavium_thunderx83, CPU::generic, 50000, Feature::cavium_thunderx83},
+    {"thunderxt81", CPU::cavium_thunderx81, CPU::generic, 50000,
+     Feature::cavium_thunderx81},
+    {"thunderxt83", CPU::cavium_thunderx83, CPU::generic, 50000,
+     Feature::cavium_thunderx83},
     {"thunderx2t99", CPU::cavium_thunderx2t99, CPU::generic, 50000,
      Feature::cavium_thunderx2t99},
     {"thunderx2t99p1", CPU::cavium_thunderx2t99p1, CPU::cavium_thunderx2t99, UINT32_MAX,
@@ -236,7 +241,8 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
     {"xgene3", CPU::apm_xgene3, CPU::generic, UINT32_MAX, Feature::apm_xgene3},
     {"kyro", CPU::qualcomm_kyro, CPU::generic, 0, Feature::qualcomm_kyro},
     {"falkor", CPU::qualcomm_falkor, CPU::generic, 40000, Feature::qualcomm_falkor},
-    {"saphira", CPU::qualcomm_saphira, CPU::qualcomm_falkor, 60000, Feature::qualcomm_saphira},
+    {"saphira", CPU::qualcomm_saphira, CPU::qualcomm_falkor, 60000,
+     Feature::qualcomm_saphira},
     {"exynos-m1", CPU::samsung_exynos_m1, CPU::generic, 0, Feature::samsung_exynos_m1},
     {"exynos-m2", CPU::samsung_exynos_m2, CPU::samsung_exynos_m1, 40000,
      Feature::samsung_exynos_m2},
@@ -245,7 +251,8 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
     {"cyclone", CPU::apple_cyclone, CPU::generic, 0, Feature::apple_cyclone},
     {"typhoon", CPU::apple_typhoon, CPU::apple_cyclone, UINT32_MAX, Feature::apple_typhoon},
     {"twister", CPU::apple_twister, CPU::apple_typhoon, UINT32_MAX, Feature::apple_twister},
-    {"hurricane", CPU::apple_hurricane, CPU::apple_twister, UINT32_MAX, Feature::apple_hurricane},
+    {"hurricane", CPU::apple_hurricane, CPU::apple_twister, UINT32_MAX,
+     Feature::apple_hurricane},
 };
 #else
 static constexpr size_t feature_sz = 3;
@@ -292,37 +299,37 @@ constexpr auto _armv7m = get_feature_masks(v7, mclass, hwdiv);
 constexpr auto _armv7a = get_feature_masks(v7, aclass);
 constexpr auto _armv7r = get_feature_masks(v7, rclass);
 constexpr auto _armv8m = get_feature_masks(v7, v8, mclass, hwdiv);
-constexpr auto _armv8a = get_feature_masks(v7, v8, aclass, neon, vfp3, vfp4, d32,
-                                           hwdiv, hwdiv_arm);
-constexpr auto _armv8r = get_feature_masks(v7, v8, rclass, neon, vfp3, vfp4, d32,
-                                           hwdiv, hwdiv_arm);
+constexpr auto _armv8a =
+    get_feature_masks(v7, v8, aclass, neon, vfp3, vfp4, d32, hwdiv, hwdiv_arm);
+constexpr auto _armv8r =
+    get_feature_masks(v7, v8, rclass, neon, vfp3, vfp4, d32, hwdiv, hwdiv_arm);
 
 // Set `generic` to match the feature requirement of the `C` code.
 // we'll require at least these when compiling the sysimg.
 #if __ARM_ARCH >= 8
-#  if !defined(__ARM_ARCH_PROFILE)
+#if !defined(__ARM_ARCH_PROFILE)
 constexpr auto generic = get_feature_masks(v7, v8, hwdiv);
-#  elif __ARM_ARCH_PROFILE == 'A'
+#elif __ARM_ARCH_PROFILE == 'A'
 constexpr auto generic = _armv8a;
-#  elif __ARM_ARCH_PROFILE == 'R'
+#elif __ARM_ARCH_PROFILE == 'R'
 constexpr auto generic = _armv8r;
-#  elif __ARM_ARCH_PROFILE == 'M'
+#elif __ARM_ARCH_PROFILE == 'M'
 constexpr auto generic = _armv8m;
-#  else
+#else
 constexpr auto generic = get_feature_masks(v7, v8, hwdiv);
-#  endif
+#endif
 #elif __ARM_ARCH == 7
-#  if !defined(__ARM_ARCH_PROFILE)
+#if !defined(__ARM_ARCH_PROFILE)
 constexpr auto generic = get_feature_masks(v7);
-#  elif __ARM_ARCH_PROFILE == 'A'
+#elif __ARM_ARCH_PROFILE == 'A'
 constexpr auto generic = _armv7a;
-#  elif __ARM_ARCH_PROFILE == 'R'
+#elif __ARM_ARCH_PROFILE == 'R'
 constexpr auto generic = _armv7r;
-#  elif __ARM_ARCH_PROFILE == 'M'
+#elif __ARM_ARCH_PROFILE == 'M'
 constexpr auto generic = _armv7m;
-#  else
+#else
 constexpr auto generic = get_feature_masks(v7);
-#  endif
+#endif
 #else
 constexpr auto generic = get_feature_masks();
 #endif
@@ -350,8 +357,10 @@ constexpr auto arm_cortex_r5 = armv7r | get_feature_masks(vfp3, hwdiv, hwdiv_arm
 constexpr auto arm_cortex_r7 = armv7r | get_feature_masks(vfp3, hwdiv, hwdiv_arm);
 constexpr auto arm_cortex_r8 = armv7r | get_feature_masks(vfp3, hwdiv, hwdiv_arm);
 constexpr auto qualcomm_scorpion = armv7a | get_feature_masks(v7, aclass, vfp3, neon);
-constexpr auto qualcomm_krait = armv7a | get_feature_masks(vfp3, vfp4, neon, hwdiv, hwdiv_arm);
-constexpr auto apple_swift = armv7a | get_feature_masks(d32, vfp3, vfp4, neon, hwdiv, hwdiv_arm);
+constexpr auto qualcomm_krait =
+    armv7a | get_feature_masks(vfp3, vfp4, neon, hwdiv, hwdiv_arm);
+constexpr auto apple_swift =
+    armv7a | get_feature_masks(d32, vfp3, vfp4, neon, hwdiv, hwdiv_arm);
 constexpr auto marvell_pj4 = armv7a | get_feature_masks(vfp3);
 constexpr auto intel_3735d = armv7a | get_feature_masks(vfp3, neon);
 // armv8ml
@@ -429,7 +438,8 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
     {"cortex-r5", CPU::arm_cortex_r5, CPU::generic, 0, Feature::arm_cortex_r5},
     {"cortex-r7", CPU::arm_cortex_r7, CPU::generic, 0, Feature::arm_cortex_r7},
     {"cortex-r8", CPU::arm_cortex_r8, CPU::generic, 0, Feature::arm_cortex_r8},
-    {"scorpion", CPU::qualcomm_scorpion, CPU::armv7_a, UINT32_MAX, Feature::qualcomm_scorpion},
+    {"scorpion", CPU::qualcomm_scorpion, CPU::armv7_a, UINT32_MAX,
+     Feature::qualcomm_scorpion},
     {"krait", CPU::qualcomm_krait, CPU::generic, 0, Feature::qualcomm_krait},
     {"swift", CPU::apple_swift, CPU::generic, 0, Feature::apple_swift},
     {"pj4", CPU::marvell_pj4, CPU::armv7_a, UINT32_MAX, Feature::marvell_pj4},
@@ -451,13 +461,16 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
     {"cortex-r52", CPU::arm_cortex_r52, CPU::armv8_r, 40000, Feature::arm_cortex_r52},
     {"cortex-a35", CPU::arm_cortex_a35, CPU::generic, 0, Feature::arm_cortex_a35},
     {"cortex-a53", CPU::arm_cortex_a53, CPU::generic, 0, Feature::arm_cortex_a53},
-    {"cortex-a55", CPU::arm_cortex_a55, CPU::arm_cortex_a53, 60000, Feature::arm_cortex_a55},
+    {"cortex-a55", CPU::arm_cortex_a55, CPU::arm_cortex_a53, 60000,
+     Feature::arm_cortex_a55},
     {"cortex-a57", CPU::arm_cortex_a57, CPU::generic, 0, Feature::arm_cortex_a57},
     {"cortex-a72", CPU::arm_cortex_a72, CPU::generic, 0, Feature::arm_cortex_a72},
     {"cortex-a73", CPU::arm_cortex_a73, CPU::generic, 0, Feature::arm_cortex_a73},
-    {"cortex-a75", CPU::arm_cortex_a75, CPU::arm_cortex_a73, 60000, Feature::arm_cortex_a75},
+    {"cortex-a75", CPU::arm_cortex_a75, CPU::arm_cortex_a73, 60000,
+     Feature::arm_cortex_a75},
     {"thunderx", CPU::cavium_thunderx, CPU::armv8_a, UINT32_MAX, Feature::cavium_thunderx},
-    {"thunderx88", CPU::cavium_thunderx88, CPU::armv8_a, UINT32_MAX, Feature::cavium_thunderx88},
+    {"thunderx88", CPU::cavium_thunderx88, CPU::armv8_a, UINT32_MAX,
+     Feature::cavium_thunderx88},
     {"thunderx88p1", CPU::cavium_thunderx88p1, CPU::armv8_a, UINT32_MAX,
      Feature::cavium_thunderx88p1},
     {"thunderx81", CPU::cavium_thunderx81, CPU::armv8_a, UINT32_MAX,
@@ -468,8 +481,10 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
      Feature::cavium_thunderx2t99},
     {"thunderx2t99p1", CPU::cavium_thunderx2t99p1, CPU::armv8_a, UINT32_MAX,
      Feature::cavium_thunderx2t99p1},
-    {"denver1", CPU::nvidia_denver1, CPU::arm_cortex_a53, UINT32_MAX, Feature::nvidia_denver1},
-    {"denver2", CPU::nvidia_denver2, CPU::arm_cortex_a57, UINT32_MAX, Feature::nvidia_denver2},
+    {"denver1", CPU::nvidia_denver1, CPU::arm_cortex_a53, UINT32_MAX,
+     Feature::nvidia_denver1},
+    {"denver2", CPU::nvidia_denver2, CPU::arm_cortex_a57, UINT32_MAX,
+     Feature::nvidia_denver2},
     {"xgene1", CPU::apm_xgene1, CPU::armv8_a, UINT32_MAX, Feature::apm_xgene1},
     {"xgene2", CPU::apm_xgene2, CPU::armv8_a, UINT32_MAX, Feature::apm_xgene2},
     {"xgene3", CPU::apm_xgene3, CPU::armv8_a, UINT32_MAX, Feature::apm_xgene3},
@@ -484,7 +499,8 @@ static constexpr CPUSpec<CPU, feature_sz> cpus[] = {
     {"cyclone", CPU::apple_cyclone, CPU::generic, 0, Feature::apple_cyclone},
     {"typhoon", CPU::apple_typhoon, CPU::apple_cyclone, UINT32_MAX, Feature::apple_typhoon},
     {"twister", CPU::apple_twister, CPU::apple_typhoon, UINT32_MAX, Feature::apple_twister},
-    {"hurricane", CPU::apple_hurricane, CPU::apple_twister, UINT32_MAX, Feature::apple_hurricane},
+    {"hurricane", CPU::apple_hurricane, CPU::apple_twister, UINT32_MAX,
+     Feature::apple_hurricane},
 };
 #endif
 static constexpr size_t ncpu_names = sizeof(cpus) / sizeof(cpus[0]);
@@ -492,10 +508,10 @@ static constexpr size_t ncpu_names = sizeof(cpus) / sizeof(cpus[0]);
 // auxval reader
 
 #ifndef AT_HWCAP
-#  define AT_HWCAP 16
+#define AT_HWCAP 16
 #endif
 #ifndef AT_HWCAP2
-#  define AT_HWCAP2 26
+#define AT_HWCAP2 26
 #endif
 
 #if defined(DYN_GETAUXVAL)
@@ -568,7 +584,8 @@ static inline void get_cpuinfo_sysfs(std::set<CPUID> &res)
         if (strncmp(entry->d_name, "cpu", 3) != 0)
             continue;
         std::stringstream stm;
-        stm << "/sys/devices/system/cpu/" << entry->d_name << "/regs/identification/midr_el1";
+        stm << "/sys/devices/system/cpu/" << entry->d_name
+            << "/regs/identification/midr_el1";
         std::ifstream file(stm.str());
         if (!file)
             continue;
@@ -576,11 +593,8 @@ static inline void get_cpuinfo_sysfs(std::set<CPUID> &res)
         file >> std::hex >> val;
         if (!file)
             continue;
-        CPUID cpuid = {
-            uint8_t(val >> 24),
-            uint8_t((val >> 20) & 0xf),
-            uint16_t((val >> 4) & 0xfff)
-        };
+        CPUID cpuid = {uint8_t(val >> 24), uint8_t((val >> 20) & 0xf),
+                       uint16_t((val >> 4) & 0xfff)};
         res.insert(cpuid);
     }
     closedir(dir);
@@ -607,7 +621,7 @@ static inline void get_cpuinfo_procfs(std::set<CPUID> &res)
     bool impl = false;
     bool part = false;
     bool var = false;
-    auto reset = [&] () {
+    auto reset = [&]() {
         if (impl && part)
             res.insert(cpuid);
         impl = false;
@@ -707,22 +721,16 @@ static CPU get_cpu_name(CPUID cpuid)
     case 0x51: // Qualcomm
         switch (cpuid.part) {
         case 0x00f:
-        case 0x02d:
-            return CPU::qualcomm_scorpion;
+        case 0x02d: return CPU::qualcomm_scorpion;
         case 0x04d:
-        case 0x06f:
-            return CPU::qualcomm_krait;
+        case 0x06f: return CPU::qualcomm_krait;
         case 0x201:
         case 0x205:
-        case 0x211:
-            return CPU::qualcomm_kyro;
+        case 0x211: return CPU::qualcomm_kyro;
         case 0x800:
-        case 0x801:
-            return CPU::arm_cortex_a73; // second-generation Kryo
-        case 0xc00:
-            return CPU::qualcomm_falkor;
-        case 0xc01:
-            return CPU::qualcomm_saphira;
+        case 0x801: return CPU::arm_cortex_a73; // second-generation Kryo
+        case 0xc00: return CPU::qualcomm_falkor;
+        case 0xc01: return CPU::qualcomm_saphira;
         default: return CPU::generic;
         }
     case 0x53: // Samsung
@@ -735,8 +743,7 @@ static CPU get_cpu_name(CPUID cpuid)
     case 0x56: // Marvell
         switch (cpuid.part) {
         case 0x581:
-        case 0x584:
-            return CPU::marvell_pj4;
+        case 0x584: return CPU::marvell_pj4;
         default: return CPU::generic;
         }
     case 0x67: // Apple
@@ -753,12 +760,11 @@ static CPU get_cpu_name(CPUID cpuid)
         case 0x001: return CPU::intel_3735d;
         default: return CPU::generic;
         }
-    default:
-        return CPU::generic;
+    default: return CPU::generic;
     }
 }
 
-static std::pair<int,char> get_elf_arch(void)
+static std::pair<int, char> get_elf_arch(void)
 {
 #ifdef _CPU_AARCH64_
     return std::make_pair(8, 'A');
@@ -778,25 +784,26 @@ static std::pair<int,char> get_elf_arch(void)
             ver = 7;
             profile = 'M';
         }
-        else if (strcmp(name.machine, "armv8l") == 0 || strcmp(name.machine, "aarch64") == 0) {
+        else if (strcmp(name.machine, "armv8l") == 0 ||
+                 strcmp(name.machine, "aarch64") == 0) {
             ver = 8;
         }
     }
     if (__ARM_ARCH > ver)
         ver = __ARM_ARCH;
-#  if __ARM_ARCH > 6 && defined(__ARM_ARCH_PROFILE)
+#if __ARM_ARCH > 6 && defined(__ARM_ARCH_PROFILE)
     profile = __ARM_ARCH_PROFILE;
-#  endif
+#endif
     return std::make_pair(ver, profile);
 #endif
 }
 
-static inline const CPUSpec<CPU,feature_sz> *find_cpu(uint32_t cpu)
+static inline const CPUSpec<CPU, feature_sz> *find_cpu(uint32_t cpu)
 {
     return ::find_cpu(cpu, cpus, ncpu_names);
 }
 
-static inline const CPUSpec<CPU,feature_sz> *find_cpu(llvm::StringRef name)
+static inline const CPUSpec<CPU, feature_sz> *find_cpu(llvm::StringRef name)
 {
     return ::find_cpu(name, cpus, ncpu_names);
 }
@@ -806,7 +813,7 @@ static inline const char *find_cpu_name(uint32_t cpu)
     return ::find_cpu_name(cpu, cpus, ncpu_names);
 }
 
-static std::pair<int,bool> feature_arch_version(const FeatureList<feature_sz> &feature)
+static std::pair<int, bool> feature_arch_version(const FeatureList<feature_sz> &feature)
 {
 #ifdef _CPU_AARCH64_
     return std::make_pair(8, false);
@@ -819,16 +826,16 @@ static std::pair<int,bool> feature_arch_version(const FeatureList<feature_sz> &f
 #endif
 }
 
-static CPU generic_for_arch(std::pair<int,bool> arch)
+static CPU generic_for_arch(std::pair<int, bool> arch)
 {
 #ifdef _CPU_AARCH64_
     return CPU::generic;
 #else
-#  if defined(__ARM_ARCH_PROFILE)
+#if defined(__ARM_ARCH_PROFILE)
     char klass = __ARM_ARCH_PROFILE;
-#  else
+#else
     char klass = arch.second ? 'M' : 'A';
-#  endif
+#endif
     if (arch.first >= 8) {
         if (klass == 'M') {
             return CPU::armv8_m_base;
@@ -855,7 +862,7 @@ static CPU generic_for_arch(std::pair<int,bool> arch)
 #endif
 }
 
-static bool check_cpu_arch_ver(uint32_t cpu, std::pair<int,bool> arch)
+static bool check_cpu_arch_ver(uint32_t cpu, std::pair<int, bool> arch)
 {
     auto spec = find_cpu(cpu);
     // This happens on AArch64 and indicates that the cpu name isn't a valid aarch64 CPU
@@ -869,10 +876,10 @@ static bool check_cpu_arch_ver(uint32_t cpu, std::pair<int,bool> arch)
     return true;
 }
 
-static void shrink_big_little(std::vector<std::pair<uint32_t,CPUID>> &list,
+static void shrink_big_little(std::vector<std::pair<uint32_t, CPUID>> &list,
                               const CPU *cpus, uint32_t ncpu)
 {
-    auto find = [&] (uint32_t name) {
+    auto find = [&](uint32_t name) {
         for (uint32_t i = 0; i < ncpu; i++) {
             if (cpus[i] == CPU(name)) {
                 return (int)i;
@@ -881,26 +888,28 @@ static void shrink_big_little(std::vector<std::pair<uint32_t,CPUID>> &list,
         return -1;
     };
     int maxidx = -1;
-    for (auto &ele: list) {
+    for (auto &ele : list) {
         int idx = find(ele.first);
         if (idx > maxidx) {
             maxidx = idx;
         }
     }
     if (maxidx >= 0) {
-        list.erase(std::remove_if(list.begin(), list.end(), [&] (std::pair<uint32_t,CPUID> &ele) {
-                    int idx = find(ele.first);
-                    return idx != -1 && idx < maxidx;
-                }), list.end());
+        list.erase(std::remove_if(list.begin(), list.end(),
+                                  [&](std::pair<uint32_t, CPUID> &ele) {
+                                      int idx = find(ele.first);
+                                      return idx != -1 && idx < maxidx;
+                                  }),
+                   list.end());
     }
 }
 
-static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu()
+static NOINLINE std::pair<uint32_t, FeatureList<feature_sz>> _get_host_cpu()
 {
     FeatureList<feature_sz> features = {};
     // Here we assume that only the lower 32bit are used on aarch64
-    // Change the cast here when that's not the case anymore (and when there's features in the
-    // high bits that we want to detect).
+    // Change the cast here when that's not the case anymore (and when there's features in
+    // the high bits that we want to detect).
     features[0] = (uint32_t)jl_getauxval(AT_HWCAP);
     features[1] = (uint32_t)jl_getauxval(AT_HWCAP2);
     auto cpuinfo = get_cpuinfo();
@@ -918,20 +927,15 @@ static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu()
         }
     }
     switch (arch.first) {
-    case 8:
-    set_bit(features, Feature::v8, true);
-    JL_FALLTHROUGH;
-    case 7:
-    set_bit(features, Feature::v7, true);
-    break;
-    default:
-    break;
+    case 8: set_bit(features, Feature::v8, true); JL_FALLTHROUGH;
+    case 7: set_bit(features, Feature::v7, true); break;
+    default: break;
     }
 #endif
 
     std::set<uint32_t> cpus;
-    std::vector<std::pair<uint32_t,CPUID>> list;
-    for (auto info: cpuinfo) {
+    std::vector<std::pair<uint32_t, CPUID>> list;
+    for (auto info : cpuinfo) {
         auto name = (uint32_t)get_cpu_name(info);
         if (name == 0)
             continue;
@@ -943,30 +947,18 @@ static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu()
         }
     }
     // Not all elements/pairs are valid
-    static constexpr CPU v8order[] = {
-        CPU::arm_cortex_a32,
-        CPU::arm_cortex_a35,
-        CPU::arm_cortex_a53,
-        CPU::arm_cortex_a55,
-        CPU::arm_cortex_a57,
-        CPU::arm_cortex_a72,
-        CPU::arm_cortex_a73,
-        CPU::arm_cortex_a75,
-        CPU::nvidia_denver2,
-        CPU::samsung_exynos_m1
-    };
+    static constexpr CPU v8order[] = {CPU::arm_cortex_a32, CPU::arm_cortex_a35,
+                                      CPU::arm_cortex_a53, CPU::arm_cortex_a55,
+                                      CPU::arm_cortex_a57, CPU::arm_cortex_a72,
+                                      CPU::arm_cortex_a73, CPU::arm_cortex_a75,
+                                      CPU::nvidia_denver2, CPU::samsung_exynos_m1};
     shrink_big_little(list, v8order, sizeof(v8order) / sizeof(CPU));
 #ifdef _CPU_ARM_
     // Not all elements/pairs are valid
-    static constexpr CPU v7order[] = {
-        CPU::arm_cortex_a5,
-        CPU::arm_cortex_a7,
-        CPU::arm_cortex_a8,
-        CPU::arm_cortex_a9,
-        CPU::arm_cortex_a12,
-        CPU::arm_cortex_a15,
-        CPU::arm_cortex_a17
-    };
+    static constexpr CPU v7order[] = {CPU::arm_cortex_a5,  CPU::arm_cortex_a7,
+                                      CPU::arm_cortex_a8,  CPU::arm_cortex_a9,
+                                      CPU::arm_cortex_a12, CPU::arm_cortex_a15,
+                                      CPU::arm_cortex_a17};
     shrink_big_little(list, v7order, sizeof(v7order) / sizeof(CPU));
 #endif
     uint32_t cpu = 0;
@@ -985,7 +977,7 @@ static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu()
     return std::make_pair(cpu, features);
 }
 
-static inline const std::pair<uint32_t,FeatureList<feature_sz>> &get_host_cpu()
+static inline const std::pair<uint32_t, FeatureList<feature_sz>> &get_host_cpu()
 {
     static auto host_cpu = _get_host_cpu();
     return host_cpu;
@@ -1005,10 +997,8 @@ static bool is_generic_cpu_name(uint32_t cpu)
     case CPU::armv8_r:
     case CPU::armv8_1_a:
     case CPU::armv8_2_a:
-    case CPU::armv8_3_a:
-        return true;
-    default:
-        return false;
+    case CPU::armv8_3_a: return true;
+    default: return false;
     }
 }
 
@@ -1074,7 +1064,7 @@ static inline void disable_depends(FeatureList<n> &features)
 
 static const std::vector<TargetData<feature_sz>> &get_cmdline_targets(void)
 {
-    auto feature_cb = [] (const char *str, size_t len, FeatureList<feature_sz> &list) {
+    auto feature_cb = [](const char *str, size_t len, FeatureList<feature_sz> &list) {
         auto fbit = find_feature_bit(feature_names, nfeature_names, str, len);
         if (fbit == (uint32_t)-1)
             return false;
@@ -1086,7 +1076,8 @@ static const std::vector<TargetData<feature_sz>> &get_cmdline_targets(void)
 
 static std::vector<TargetData<feature_sz>> jit_targets;
 
-static TargetData<feature_sz> arg_target_data(const TargetData<feature_sz> &arg, bool require_host)
+static TargetData<feature_sz> arg_target_data(const TargetData<feature_sz> &arg,
+                                              bool require_host)
 {
     TargetData<feature_sz> res = arg;
     const FeatureList<feature_sz> *cpu_features = nullptr;
@@ -1141,7 +1132,7 @@ static uint32_t sysimg_init_cb(const void *id)
     auto &cmdline = get_cmdline_targets();
     TargetData<feature_sz> target = arg_target_data(cmdline[0], true);
     // Then find the best match in the sysimg
-    auto sysimg = deserialize_target_data<feature_sz>((const uint8_t*)id);
+    auto sysimg = deserialize_target_data<feature_sz>((const uint8_t *)id);
     auto match = match_sysimg_targets(sysimg, target, max_vector_size);
     // Now we've decided on which sysimg version to use.
     // Make sure the JIT target is compatible with it and save the JIT target.
@@ -1161,7 +1152,7 @@ static void ensure_jit_target(bool imaging)
     check_cmdline(cmdline, imaging);
     if (!jit_targets.empty())
         return;
-    for (auto &arg: cmdline) {
+    for (auto &arg : cmdline) {
         auto data = arg_target_data(arg, jit_targets.empty());
         jit_targets.push_back(std::move(data));
     }
@@ -1175,15 +1166,16 @@ static void ensure_jit_target(bool imaging)
         t.en.flags |= JL_TARGET_CLONE_LOOP;
 #ifdef _CPU_ARM_
         auto &features0 = jit_targets[t.base].en.features;
-        static constexpr uint32_t clone_math[] = {Feature::vfp3, Feature::vfp4, Feature::neon};
-        for (auto fe: clone_math) {
+        static constexpr uint32_t clone_math[] = {Feature::vfp3, Feature::vfp4,
+                                                  Feature::neon};
+        for (auto fe : clone_math) {
             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
                 t.en.flags |= JL_TARGET_CLONE_MATH;
                 break;
             }
         }
         static constexpr uint32_t clone_simd[] = {Feature::neon};
-        for (auto fe: clone_simd) {
+        for (auto fe : clone_simd) {
             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
                 t.en.flags |= JL_TARGET_CLONE_SIMD;
                 break;
@@ -1193,7 +1185,7 @@ static void ensure_jit_target(bool imaging)
     }
 }
 
-static std::pair<std::string,std::vector<std::string>>
+static std::pair<std::string, std::vector<std::string>>
 get_llvm_target_noext(const TargetData<feature_sz> &data)
 {
     std::string name = data.name;
@@ -1212,7 +1204,7 @@ get_llvm_target_noext(const TargetData<feature_sz> &data)
         }
     }
     std::vector<std::string> feature_strs;
-    for (auto &fename: feature_names) {
+    for (auto &fename : feature_names) {
         if (fename.llvmver > JL_LLVM_VERSION)
             continue;
         if (fename.bit >= 32 * 2)
@@ -1282,7 +1274,7 @@ get_llvm_target_noext(const TargetData<feature_sz> &data)
     return std::make_pair(std::move(name), std::move(feature_strs));
 }
 
-static std::pair<std::string,std::vector<std::string>>
+static std::pair<std::string, std::vector<std::string>>
 get_llvm_target_vec(const TargetData<feature_sz> &data)
 {
     auto res0 = get_llvm_target_noext(data);
@@ -1290,7 +1282,7 @@ get_llvm_target_vec(const TargetData<feature_sz> &data)
     return res0;
 }
 
-static std::pair<std::string,std::string>
+static std::pair<std::string, std::string>
 get_llvm_target_str(const TargetData<feature_sz> &data)
 {
     auto res0 = get_llvm_target_noext(data);
@@ -1333,8 +1325,8 @@ using namespace ARM;
 
 JL_DLLEXPORT void jl_dump_host_cpu(void)
 {
-    dump_cpu_spec(get_host_cpu().first, get_host_cpu().second, feature_names, nfeature_names,
-                  cpus, ncpu_names);
+    dump_cpu_spec(get_host_cpu().first, get_host_cpu().second, feature_names,
+                  nfeature_names, cpus, ncpu_names);
 }
 
 JL_DLLEXPORT jl_value_t *jl_get_cpu_name(void)
@@ -1349,20 +1341,24 @@ jl_sysimg_fptrs_t jl_init_processor_sysimg(void *hdl)
     return parse_sysimg(hdl, sysimg_init_cb);
 }
 
-std::pair<std::string,std::vector<std::string>> jl_get_llvm_target(bool imaging, uint32_t &flags)
+std::pair<std::string, std::vector<std::string>> jl_get_llvm_target(bool imaging,
+                                                                    uint32_t &flags)
 {
     ensure_jit_target(imaging);
     flags = jit_targets[0].en.flags;
     return get_llvm_target_vec(jit_targets[0]);
 }
 
-const std::pair<std::string,std::string> &jl_get_llvm_disasm_target(void)
+const std::pair<std::string, std::string> &jl_get_llvm_disasm_target(void)
 {
     // RAS is not currently detectable AFAICT
     auto max_feature = get_max_feature();
-    static const auto res = get_llvm_target_str(TargetData<feature_sz>{host_cpu_name(),
-                "+dotprod,+ras",
-                {max_feature, 0}, {feature_masks & ~max_feature, 0}, 0});
+    static const auto res =
+        get_llvm_target_str(TargetData<feature_sz>{host_cpu_name(),
+                                                   "+dotprod,+ras",
+                                                   {max_feature, 0},
+                                                   {feature_masks & ~max_feature, 0},
+                                                   0});
     return res;
 }
 
@@ -1371,10 +1367,10 @@ std::vector<jl_target_spec_t> jl_get_llvm_clone_targets(void)
     if (jit_targets.empty())
         jl_error("JIT targets not initialized");
     std::vector<jl_target_spec_t> res;
-    for (auto &target: jit_targets) {
+    for (auto &target : jit_targets) {
         auto features_en = target.en.features;
         auto features_dis = target.dis.features;
-        for (auto &fename: feature_names) {
+        for (auto &fename : feature_names) {
             if (fename.llvmver > JL_LLVM_VERSION) {
                 unset_bits(features_en, fename.bit);
                 unset_bits(features_dis, fename.bit);
@@ -1412,7 +1408,7 @@ static inline uint32_t get_fpcr_aarch64(void)
 
 static inline void set_fpcr_aarch64(uint32_t fpcr)
 {
-    asm volatile("msr fpcr, %0" :: "r"(fpcr));
+    asm volatile("msr fpcr, %0" ::"r"(fpcr));
 }
 
 extern "C" JL_DLLEXPORT int32_t jl_get_zero_subnormals(void)

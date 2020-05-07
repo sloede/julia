@@ -1,11 +1,28 @@
 enum {
-    TOK_NONE, TOK_OPEN, TOK_CLOSE, TOK_DOT, TOK_QUOTE, TOK_SYM, TOK_NUM,
-    TOK_BQ, TOK_COMMA, TOK_COMMAAT, TOK_COMMADOT,
-    TOK_SHARPDOT, TOK_LABEL, TOK_BACKREF, TOK_SHARPQUOTE, TOK_SHARPOPEN,
-    TOK_OPENB, TOK_CLOSEB, TOK_SHARPSYM, TOK_GENSYM, TOK_DOUBLEQUOTE
+    TOK_NONE,
+    TOK_OPEN,
+    TOK_CLOSE,
+    TOK_DOT,
+    TOK_QUOTE,
+    TOK_SYM,
+    TOK_NUM,
+    TOK_BQ,
+    TOK_COMMA,
+    TOK_COMMAAT,
+    TOK_COMMADOT,
+    TOK_SHARPDOT,
+    TOK_LABEL,
+    TOK_BACKREF,
+    TOK_SHARPQUOTE,
+    TOK_SHARPOPEN,
+    TOK_OPENB,
+    TOK_CLOSEB,
+    TOK_SHARPSYM,
+    TOK_GENSYM,
+    TOK_DOUBLEQUOTE
 };
 
-#define readF(fl_ctx) value2c(ios_t*,fl_ctx->readstate->source)
+#define readF(fl_ctx) value2c(ios_t *, fl_ctx->readstate->source)
 
 // defines which characters are ordinary symbol characters.
 // exceptions are '.', which is an ordinary symbol character
@@ -37,71 +54,77 @@ int isnumtok_base(fl_context_t *fl_ctx, char *tok, value_t *pval, int base)
     double d;
     if (*tok == '\0')
         return 0;
-    if (!((tok[0]=='0' && tok[1]=='x') || (base >= 15)) &&
-        strpbrk(tok, ".eEpP")) {
+    if (!((tok[0] == '0' && tok[1] == 'x') || (base >= 15)) && strpbrk(tok, ".eEpP")) {
         d = jl_strtod_c(tok, &end);
         if (*end == '\0') {
-            if (pval) *pval = mk_double(fl_ctx, d);
+            if (pval)
+                *pval = mk_double(fl_ctx, d);
             return 1;
         }
         // floats can end in f or f0
         if (end > tok && end[0] == 'f' &&
-            (end[1] == '\0' ||
-             (end[1] == '0' && end[2] == '\0'))) {
-            if (pval) *pval = mk_float(fl_ctx, (float)d);
+            (end[1] == '\0' || (end[1] == '0' && end[2] == '\0'))) {
+            if (pval)
+                *pval = mk_float(fl_ctx, (float)d);
             return 1;
         }
     }
     // hexadecimal float literals
-    else if (((tok[0]=='0' && tok[1]=='x') || (base == 16)) &&
-        strpbrk(tok, "pP")) {
+    else if (((tok[0] == '0' && tok[1] == 'x') || (base == 16)) && strpbrk(tok, "pP")) {
         d = jl_strtod_c(tok, &end);
         if (*end == '\0') {
-            if (pval) *pval = mk_double(fl_ctx, d);
+            if (pval)
+                *pval = mk_double(fl_ctx, d);
             return 1;
         }
         // floats can end in f or f0
         if (end > tok && end[0] == 'f' &&
-            (end[1] == '\0' ||
-             (end[1] == '0' && end[2] == '\0'))) {
-            if (pval) *pval = mk_float(fl_ctx, (float)d);
+            (end[1] == '\0' || (end[1] == '0' && end[2] == '\0'))) {
+            if (pval)
+                *pval = mk_float(fl_ctx, (float)d);
             return 1;
         }
     }
 
     if (tok[0] == '+') {
-        if (!strcmp(tok,"+NaN") || !strcasecmp(tok,"+nan.0")) {
-            if (pval) *pval = mk_double(fl_ctx, D_PNAN);
+        if (!strcmp(tok, "+NaN") || !strcasecmp(tok, "+nan.0")) {
+            if (pval)
+                *pval = mk_double(fl_ctx, D_PNAN);
             return 1;
         }
-        if (!strcmp(tok,"+Inf") || !strcasecmp(tok,"+inf.0")) {
-            if (pval) *pval = mk_double(fl_ctx, D_PINF);
+        if (!strcmp(tok, "+Inf") || !strcasecmp(tok, "+inf.0")) {
+            if (pval)
+                *pval = mk_double(fl_ctx, D_PINF);
             return 1;
         }
     }
     else if (tok[0] == '-') {
-        if (!strcmp(tok,"-NaN") || !strcasecmp(tok,"-nan.0")) {
-            if (pval) *pval = mk_double(fl_ctx, D_NNAN);
+        if (!strcmp(tok, "-NaN") || !strcasecmp(tok, "-nan.0")) {
+            if (pval)
+                *pval = mk_double(fl_ctx, D_NNAN);
             return 1;
         }
-        if (!strcmp(tok,"-Inf") || !strcasecmp(tok,"-inf.0")) {
-            if (pval) *pval = mk_double(fl_ctx, D_NINF);
+        if (!strcmp(tok, "-Inf") || !strcasecmp(tok, "-inf.0")) {
+            if (pval)
+                *pval = mk_double(fl_ctx, D_NINF);
             return 1;
         }
         errno = 0;
         i64 = strtoll(tok, &end, base);
         if (errno)
             return 0;
-        int done = (*end == '\0');  // must access *end before alloc
-        if (pval) *pval = return_from_int64(fl_ctx, i64);
+        int done = (*end == '\0'); // must access *end before alloc
+        if (pval)
+            *pval = return_from_int64(fl_ctx, i64);
         return done;
     }
     errno = 0;
     ui64 = strtoull_0b0o(tok, &end, base);
     if (errno)
         return 0;
-    int done = (*end == '\0');  // must access *end before alloc
-    if (pval) *pval = return_from_uint64(fl_ctx, ui64);
+    int done = (*end == '\0'); // must access *end before alloc
+    if (pval)
+        *pval = return_from_uint64(fl_ctx, ui64);
     return done;
 }
 
@@ -145,7 +168,7 @@ static char nextchar(fl_context_t *fl_ctx)
             } while ((char)ch != '\n');
             c = (char)ch;
         }
-    } while (c==' ' || isspace((unsigned char)c));
+    } while (c == ' ' || isspace((unsigned char)c));
     return c;
 }
 
@@ -157,14 +180,14 @@ static void take(fl_context_t *fl_ctx)
 static void accumchar(fl_context_t *fl_ctx, char c, int *pi)
 {
     fl_ctx->readbuf[(*pi)++] = c;
-    if (*pi >= (int)(sizeof(fl_ctx->readbuf)-1))
+    if (*pi >= (int)(sizeof(fl_ctx->readbuf) - 1))
         lerror(fl_ctx, fl_ctx->ParseError, "read: token too long");
 }
 
 // return: 1 if escaped (forced to be symbol)
 static int read_token(fl_context_t *fl_ctx, char c, int digits)
 {
-    int i=0, ch, escaped=0, issym=0, first=1;
+    int i = 0, ch, escaped = 0, issym = 0, first = 1;
 
     while (1) {
         if (!first) {
@@ -193,7 +216,7 @@ static int read_token(fl_context_t *fl_ctx, char c, int digits)
         }
     }
     ios_ungetc(c, readF(fl_ctx));
- terminate:
+terminate:
     fl_ctx->readbuf[i++] = '\0';
     return issym;
 }
@@ -209,7 +232,8 @@ static uint32_t peek(fl_context_t *fl_ctx)
     if (fl_ctx->readtoktype != TOK_NONE)
         return fl_ctx->readtoktype;
     c = nextchar(fl_ctx);
-    if (ios_eof(readF(fl_ctx))) return TOK_NONE;
+    if (ios_eof(readF(fl_ctx)))
+        return TOK_NONE;
     if (c == '(') {
         fl_ctx->readtoktype = TOK_OPEN;
     }
@@ -232,7 +256,8 @@ static uint32_t peek(fl_context_t *fl_ctx)
         fl_ctx->readtoktype = TOK_DOUBLEQUOTE;
     }
     else if (c == '#') {
-        ch = ios_getc(readF(fl_ctx)); c = (char)ch;
+        ch = ios_getc(readF(fl_ctx));
+        c = (char)ch;
         if (ch == IOS_EOF)
             lerror(fl_ctx, fl_ctx->ParseError, "read: invalid read macro");
         if (c == '.') {
@@ -244,11 +269,11 @@ static uint32_t peek(fl_context_t *fl_ctx)
         else if (c == '\\') {
             uint32_t cval;
             if (ios_getutf8(readF(fl_ctx), &cval) == IOS_EOF)
-                lerror(fl_ctx, fl_ctx->ParseError, "read: end of input in character constant");
-            if (cval == (uint32_t)'u' || cval == (uint32_t)'U' ||
-                cval == (uint32_t)'x') {
+                lerror(fl_ctx, fl_ctx->ParseError,
+                       "read: end of input in character constant");
+            if (cval == (uint32_t)'u' || cval == (uint32_t)'U' || cval == (uint32_t)'x') {
                 read_token(fl_ctx, 'u', 0);
-                if (fl_ctx->readbuf[1] != '\0') {  // not a solitary 'u','U','x'
+                if (fl_ctx->readbuf[1] != '\0') { // not a solitary 'u','U','x'
                     if (!read_numtok(fl_ctx, &fl_ctx->readbuf[1], &fl_ctx->readtokval, 16))
                         lerror(fl_ctx, fl_ctx->ParseError,
                                "read: invalid hex character constant");
@@ -258,21 +283,35 @@ static uint32_t peek(fl_context_t *fl_ctx)
             else if (cval >= 'a' && cval <= 'z') {
                 read_token(fl_ctx, (char)cval, 0);
                 fl_ctx->readtokval = symbol(fl_ctx, fl_ctx->readbuf);
-                if (fl_ctx->readbuf[1] == '\0')       /* one character */;
-                else if (fl_ctx->readtokval == fl_ctx->nulsym)        cval = 0x00;
-                else if (fl_ctx->readtokval == fl_ctx->alarmsym)      cval = 0x07;
-                else if (fl_ctx->readtokval == fl_ctx->backspacesym)  cval = 0x08;
-                else if (fl_ctx->readtokval == fl_ctx->tabsym)        cval = 0x09;
-                else if (fl_ctx->readtokval == fl_ctx->linefeedsym)   cval = 0x0A;
-                else if (fl_ctx->readtokval == fl_ctx->newlinesym)    cval = 0x0A;
-                else if (fl_ctx->readtokval == fl_ctx->vtabsym)       cval = 0x0B;
-                else if (fl_ctx->readtokval == fl_ctx->pagesym)       cval = 0x0C;
-                else if (fl_ctx->readtokval == fl_ctx->returnsym)     cval = 0x0D;
-                else if (fl_ctx->readtokval == fl_ctx->escsym)        cval = 0x1B;
-                else if (fl_ctx->readtokval == fl_ctx->spacesym)      cval = 0x20;
-                else if (fl_ctx->readtokval == fl_ctx->deletesym)     cval = 0x7F;
+                if (fl_ctx->readbuf[1] == '\0') /* one character */
+                    ;
+                else if (fl_ctx->readtokval == fl_ctx->nulsym)
+                    cval = 0x00;
+                else if (fl_ctx->readtokval == fl_ctx->alarmsym)
+                    cval = 0x07;
+                else if (fl_ctx->readtokval == fl_ctx->backspacesym)
+                    cval = 0x08;
+                else if (fl_ctx->readtokval == fl_ctx->tabsym)
+                    cval = 0x09;
+                else if (fl_ctx->readtokval == fl_ctx->linefeedsym)
+                    cval = 0x0A;
+                else if (fl_ctx->readtokval == fl_ctx->newlinesym)
+                    cval = 0x0A;
+                else if (fl_ctx->readtokval == fl_ctx->vtabsym)
+                    cval = 0x0B;
+                else if (fl_ctx->readtokval == fl_ctx->pagesym)
+                    cval = 0x0C;
+                else if (fl_ctx->readtokval == fl_ctx->returnsym)
+                    cval = 0x0D;
+                else if (fl_ctx->readtokval == fl_ctx->escsym)
+                    cval = 0x1B;
+                else if (fl_ctx->readtokval == fl_ctx->spacesym)
+                    cval = 0x20;
+                else if (fl_ctx->readtokval == fl_ctx->deletesym)
+                    cval = 0x7F;
                 else
-                    lerrorf(fl_ctx, fl_ctx->ParseError, "read: unknown character #\\%s", fl_ctx->readbuf);
+                    lerrorf(fl_ctx, fl_ctx->ParseError, "read: unknown character #\\%s",
+                            fl_ctx->readbuf);
             }
             fl_ctx->readtoktype = TOK_NUM;
             fl_ctx->readtokval = mk_wchar(fl_ctx, cval);
@@ -307,10 +346,10 @@ static uint32_t peek(fl_context_t *fl_ctx)
         }
         else if (c == '|') {
             // multiline comment
-            int commentlevel=1;
+            int commentlevel = 1;
             while (1) {
                 ch = ios_getc(readF(fl_ctx));
-            hashpipe_gotc:
+hashpipe_gotc:
                 if (ch == IOS_EOF)
                     lerror(fl_ctx, fl_ctx->ParseError, "read: eof within comment");
                 if ((char)ch == '|') {
@@ -356,15 +395,13 @@ static uint32_t peek(fl_context_t *fl_ctx)
         else if (symchar(c)) {
             read_token(fl_ctx, ch, 0);
 
-            if (((c == 'b' && (base= 2)) ||
-                 (c == 'o' && (base= 8)) ||
-                 (c == 'd' && (base=10)) ||
-                 (c == 'x' && (base=16))) &&
-                (isdigit_base(fl_ctx->readbuf[1],base) ||
-                 fl_ctx->readbuf[1]=='-')) {
+            if (((c == 'b' && (base = 2)) || (c == 'o' && (base = 8)) ||
+                 (c == 'd' && (base = 10)) || (c == 'x' && (base = 16))) &&
+                (isdigit_base(fl_ctx->readbuf[1], base) || fl_ctx->readbuf[1] == '-')) {
                 if (!read_numtok(fl_ctx, &fl_ctx->readbuf[1], &fl_ctx->readtokval, base))
-                    lerrorf(fl_ctx, fl_ctx->ParseError, "read: invalid base %d constant", base);
-                return (fl_ctx->readtoktype=TOK_NUM);
+                    lerrorf(fl_ctx, fl_ctx->ParseError, "read: invalid base %d constant",
+                            base);
+                return (fl_ctx->readtoktype = TOK_NUM);
             }
 
             fl_ctx->readtoktype = TOK_SHARPSYM;
@@ -388,12 +425,12 @@ static uint32_t peek(fl_context_t *fl_ctx)
     }
     else {
         if (!read_token(fl_ctx, c, 0)) {
-            if (fl_ctx->readbuf[0]=='.' && fl_ctx->readbuf[1]=='\0') {
-                return (fl_ctx->readtoktype=TOK_DOT);
+            if (fl_ctx->readbuf[0] == '.' && fl_ctx->readbuf[1] == '\0') {
+                return (fl_ctx->readtoktype = TOK_DOT);
             }
             else {
                 if (read_numtok(fl_ctx, fl_ctx->readbuf, &fl_ctx->readtokval, 0))
-                    return (fl_ctx->readtoktype=TOK_NUM);
+                    return (fl_ctx->readtoktype = TOK_NUM);
             }
         }
         fl_ctx->readtoktype = TOK_SYM;
@@ -409,14 +446,14 @@ static value_t vector_grow(fl_context_t *fl_ctx, value_t v, int rewrite_refs)
     size_t i, s = vector_size(v);
     size_t d = vector_grow_amt(s);
     PUSH(fl_ctx, v);
-    value_t newv = alloc_vector(fl_ctx, s+d, 1);
-    v = fl_ctx->Stack[fl_ctx->SP-1];
-    for(i=0; i < s; i++)
+    value_t newv = alloc_vector(fl_ctx, s + d, 1);
+    v = fl_ctx->Stack[fl_ctx->SP - 1];
+    for (i = 0; i < s; i++)
         vector_elt(newv, i) = vector_elt(v, i);
     // use gc to rewrite references from the old vector to the new
-    fl_ctx->Stack[fl_ctx->SP-1] = newv;
+    fl_ctx->Stack[fl_ctx->SP - 1] = newv;
     if (s > 0 && rewrite_refs) {
-        ((size_t*)ptr(v))[0] |= 0x1;
+        ((size_t *)ptr(v))[0] |= 0x1;
         vector_elt(v, 0) = newv;
         gc(fl_ctx, 0);
     }
@@ -425,23 +462,23 @@ static value_t vector_grow(fl_context_t *fl_ctx, value_t v, int rewrite_refs)
 
 static value_t read_vector(fl_context_t *fl_ctx, value_t label, uint32_t closer)
 {
-    value_t v=fl_ctx->the_empty_vector, elt;
-    uint32_t i=0;
+    value_t v = fl_ctx->the_empty_vector, elt;
+    uint32_t i = 0;
     PUSH(fl_ctx, v);
     if (label != UNBOUND)
-        ptrhash_put(&fl_ctx->readstate->backrefs, (void*)label, (void*)v);
+        ptrhash_put(&fl_ctx->readstate->backrefs, (void *)label, (void *)v);
     while (peek(fl_ctx) != closer) {
         if (ios_eof(readF(fl_ctx)))
             lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected end of input");
-        v = fl_ctx->Stack[fl_ctx->SP-1]; // reload after possible alloc in peek()
+        v = fl_ctx->Stack[fl_ctx->SP - 1]; // reload after possible alloc in peek()
         if (i >= vector_size(v)) {
-            v = fl_ctx->Stack[fl_ctx->SP-1] = vector_grow(fl_ctx, v, label != UNBOUND);
+            v = fl_ctx->Stack[fl_ctx->SP - 1] = vector_grow(fl_ctx, v, label != UNBOUND);
             if (label != UNBOUND)
-                ptrhash_put(&fl_ctx->readstate->backrefs, (void*)label, (void*)v);
+                ptrhash_put(&fl_ctx->readstate->backrefs, (void *)label, (void *)v);
         }
         elt = do_read_sexpr(fl_ctx, UNBOUND);
-        v = fl_ctx->Stack[fl_ctx->SP-1];
-        vector_elt(v,i) = elt;
+        v = fl_ctx->Stack[fl_ctx->SP - 1];
+        vector_elt(v, i) = elt;
         i++;
     }
     take(fl_ctx);
@@ -454,19 +491,19 @@ static value_t read_string(fl_context_t *fl_ctx)
 {
     char *buf, *temp;
     char eseq[10];
-    size_t i=0, j, sz = 64, ndig;
+    size_t i = 0, j, sz = 64, ndig;
     int c;
     value_t s;
-    uint32_t wc=0;
+    uint32_t wc = 0;
 
-    buf = (char*)malloc(sz);
+    buf = (char *)malloc(sz);
     if (buf == NULL) {
         lerror(fl_ctx, fl_ctx->ParseError, "read: out of memory reading string");
     }
     while (1) {
-        if (i >= sz-4) {  // -4: leaves room for longest utf8 sequence
+        if (i >= sz - 4) { // -4: leaves room for longest utf8 sequence
             sz *= 2;
-            temp = (char*)realloc(buf, sz);
+            temp = (char *)realloc(buf, sz);
             if (temp == NULL) {
                 free(buf);
                 lerror(fl_ctx, fl_ctx->ParseError, "read: out of memory reading string");
@@ -486,29 +523,31 @@ static value_t read_string(fl_context_t *fl_ctx)
                 free(buf);
                 lerror(fl_ctx, fl_ctx->ParseError, "read: end of input in escape sequence");
             }
-            j=0;
+            j = 0;
             if (octal_digit(c)) {
                 do {
                     eseq[j++] = c;
                     c = ios_getc(readF(fl_ctx));
-                } while (octal_digit(c) && j<3 && (c!=IOS_EOF));
-                if (c!=IOS_EOF) ios_ungetc(c, readF(fl_ctx));
+                } while (octal_digit(c) && j < 3 && (c != IOS_EOF));
+                if (c != IOS_EOF)
+                    ios_ungetc(c, readF(fl_ctx));
                 eseq[j] = '\0';
                 wc = strtol(eseq, NULL, 8);
                 // \DDD and \xXX read bytes, not characters
                 buf[i++] = ((char)wc);
             }
-            else if ((c=='x' && (ndig=2)) ||
-                     (c=='u' && (ndig=4)) ||
-                     (c=='U' && (ndig=8))) {
+            else if ((c == 'x' && (ndig = 2)) || (c == 'u' && (ndig = 4)) ||
+                     (c == 'U' && (ndig = 8))) {
                 c = ios_getc(readF(fl_ctx));
-                while (hex_digit(c) && j<ndig && (c!=IOS_EOF)) {
+                while (hex_digit(c) && j < ndig && (c != IOS_EOF)) {
                     eseq[j++] = c;
                     c = ios_getc(readF(fl_ctx));
                 }
-                if (c!=IOS_EOF) ios_ungetc(c, readF(fl_ctx));
+                if (c != IOS_EOF)
+                    ios_ungetc(c, readF(fl_ctx));
                 eseq[j] = '\0';
-                if (j) wc = strtol(eseq, NULL, 16);
+                if (j)
+                    wc = strtol(eseq, NULL, 16);
                 if (!j || wc > 0x10ffff) {
                     free(buf);
                     lerror(fl_ctx, fl_ctx->ParseError, "read: invalid escape sequence");
@@ -546,23 +585,24 @@ static void read_list(fl_context_t *fl_ctx, value_t *pval, value_t label)
     uint32_t t;
 
     PUSH(fl_ctx, fl_ctx->NIL);
-    pc = &fl_ctx->Stack[fl_ctx->SP-1];  // to keep track of current cons cell
+    pc = &fl_ctx->Stack[fl_ctx->SP - 1]; // to keep track of current cons cell
     t = peek(fl_ctx);
     while (t != TOK_CLOSE) {
         if (ios_eof(readF(fl_ctx)))
             lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected end of input");
-        c = mk_cons(fl_ctx); car_(c) = cdr_(c) = fl_ctx->NIL;
+        c = mk_cons(fl_ctx);
+        car_(c) = cdr_(c) = fl_ctx->NIL;
         if (iscons(*pc)) {
             cdr_(*pc) = c;
         }
         else {
             *pval = c;
             if (label != UNBOUND)
-                ptrhash_put(&fl_ctx->readstate->backrefs, (void*)label, (void*)c);
+                ptrhash_put(&fl_ctx->readstate->backrefs, (void *)label, (void *)c);
         }
         *pc = c;
         c = do_read_sexpr(fl_ctx, UNBOUND); // must be on separate lines due to
-        car_(*pc) = c;              // undefined evaluation order
+        car_(*pc) = c; // undefined evaluation order
 
         t = peek(fl_ctx);
         if (t == TOK_DOT) {
@@ -591,46 +631,37 @@ static value_t do_read_sexpr(fl_context_t *fl_ctx, value_t label)
     t = peek(fl_ctx);
     take(fl_ctx);
     switch (t) {
-    case TOK_CLOSE:
-        lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected ')'");
-    case TOK_CLOSEB:
-        lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected ']'");
-    case TOK_DOT:
-        lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected '.'");
+    case TOK_CLOSE: lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected ')'");
+    case TOK_CLOSEB: lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected ']'");
+    case TOK_DOT: lerror(fl_ctx, fl_ctx->ParseError, "read: unexpected '.'");
     case TOK_SYM:
-    case TOK_NUM:
-        return fl_ctx->readtokval;
-    case TOK_COMMA:
-        head = &fl_ctx->COMMA; goto listwith;
-    case TOK_COMMAAT:
-        head = &fl_ctx->COMMAAT; goto listwith;
-    case TOK_COMMADOT:
-        head = &fl_ctx->COMMADOT; goto listwith;
-    case TOK_BQ:
-        head = &fl_ctx->BACKQUOTE; goto listwith;
-    case TOK_QUOTE:
-        head = &fl_ctx->QUOTE;
-    listwith:
+    case TOK_NUM: return fl_ctx->readtokval;
+    case TOK_COMMA: head = &fl_ctx->COMMA; goto listwith;
+    case TOK_COMMAAT: head = &fl_ctx->COMMAAT; goto listwith;
+    case TOK_COMMADOT: head = &fl_ctx->COMMADOT; goto listwith;
+    case TOK_BQ: head = &fl_ctx->BACKQUOTE; goto listwith;
+    case TOK_QUOTE: head = &fl_ctx->QUOTE;
+        listwith:
 #ifdef MEMDEBUG2
         v = fl_list2(fl_ctx, *head, fl_ctx->NIL);
 #else
         v = cons_reserve(fl_ctx, 2);
         car_(v) = *head;
-        cdr_(v) = tagptr(((cons_t*)ptr(v))+1, TAG_CONS);
+        cdr_(v) = tagptr(((cons_t *)ptr(v)) + 1, TAG_CONS);
         car_(cdr_(v)) = cdr_(cdr_(v)) = fl_ctx->NIL;
 #endif
         PUSH(fl_ctx, v);
         if (label != UNBOUND)
-            ptrhash_put(&fl_ctx->readstate->backrefs, (void*)label, (void*)v);
+            ptrhash_put(&fl_ctx->readstate->backrefs, (void *)label, (void *)v);
         v = do_read_sexpr(fl_ctx, UNBOUND);
-        car_(cdr_(fl_ctx->Stack[fl_ctx->SP-1])) = v;
+        car_(cdr_(fl_ctx->Stack[fl_ctx->SP - 1])) = v;
         return POP(fl_ctx);
     case TOK_SHARPQUOTE:
         // femtoLisp doesn't need symbol-function, so #' does nothing
         return do_read_sexpr(fl_ctx, label);
     case TOK_OPEN:
         PUSH(fl_ctx, fl_ctx->NIL);
-        read_list(fl_ctx, &fl_ctx->Stack[fl_ctx->SP-1], label);
+        read_list(fl_ctx, &fl_ctx->Stack[fl_ctx->SP - 1], label);
         return POP(fl_ctx);
     case TOK_SHARPSYM:
         sym = fl_ctx->readtokval;
@@ -646,10 +677,11 @@ static value_t do_read_sexpr(fl_context_t *fl_ctx, value_t label)
                     symbol_name(fl_ctx, fl_ctx->readtokval));
         }
         PUSH(fl_ctx, fl_ctx->NIL);
-        read_list(fl_ctx, &fl_ctx->Stack[fl_ctx->SP-1], UNBOUND);
+        read_list(fl_ctx, &fl_ctx->Stack[fl_ctx->SP - 1], UNBOUND);
         if (sym == fl_ctx->vu8sym) {
             sym = fl_ctx->arraysym;
-            fl_ctx->Stack[fl_ctx->SP-1] = fl_cons(fl_ctx, fl_ctx->uint8sym, fl_ctx->Stack[fl_ctx->SP-1]);
+            fl_ctx->Stack[fl_ctx->SP - 1] =
+                fl_cons(fl_ctx, fl_ctx->uint8sym, fl_ctx->Stack[fl_ctx->SP - 1]);
         }
         else if (sym == fl_ctx->fnsym) {
             sym = fl_ctx->FUNCTION;
@@ -658,10 +690,8 @@ static value_t do_read_sexpr(fl_context_t *fl_ctx, value_t label)
         if (v == UNBOUND)
             fl_raise(fl_ctx, fl_list2(fl_ctx, fl_ctx->UnboundError, sym));
         return fl_apply(fl_ctx, v, POP(fl_ctx));
-    case TOK_OPENB:
-        return read_vector(fl_ctx, label, TOK_CLOSEB);
-    case TOK_SHARPOPEN:
-        return read_vector(fl_ctx, label, TOK_CLOSE);
+    case TOK_OPENB: return read_vector(fl_ctx, label, TOK_CLOSEB);
+    case TOK_SHARPOPEN: return read_vector(fl_ctx, label, TOK_CLOSE);
     case TOK_SHARPDOT:
         // eval-when-read
         // evaluated expressions can refer to existing backreferences, but they
@@ -678,25 +708,26 @@ static value_t do_read_sexpr(fl_context_t *fl_ctx, value_t label)
         return fl_toplevel_eval(fl_ctx, sym);
     case TOK_LABEL:
         // create backreference label
-        if (ptrhash_has(&fl_ctx->readstate->backrefs, (void*)fl_ctx->readtokval))
-            lerrorf(fl_ctx, fl_ctx->ParseError, "read: label %ld redefined", numval(fl_ctx->readtokval));
+        if (ptrhash_has(&fl_ctx->readstate->backrefs, (void *)fl_ctx->readtokval))
+            lerrorf(fl_ctx, fl_ctx->ParseError, "read: label %ld redefined",
+                    numval(fl_ctx->readtokval));
         oldtokval = fl_ctx->readtokval;
         v = do_read_sexpr(fl_ctx, fl_ctx->readtokval);
-        ptrhash_put(&fl_ctx->readstate->backrefs, (void*)oldtokval, (void*)v);
+        ptrhash_put(&fl_ctx->readstate->backrefs, (void *)oldtokval, (void *)v);
         return v;
     case TOK_BACKREF:
         // look up backreference
-        v = (value_t)ptrhash_get(&fl_ctx->readstate->backrefs, (void*)fl_ctx->readtokval);
+        v = (value_t)ptrhash_get(&fl_ctx->readstate->backrefs, (void *)fl_ctx->readtokval);
         if (v == (value_t)HT_NOTFOUND)
-            lerrorf(fl_ctx, fl_ctx->ParseError, "read: undefined label %ld", numval(fl_ctx->readtokval));
+            lerrorf(fl_ctx, fl_ctx->ParseError, "read: undefined label %ld",
+                    numval(fl_ctx->readtokval));
         return v;
     case TOK_GENSYM:
-        pv = (value_t*)ptrhash_bp(&fl_ctx->readstate->gensyms, (void*)fl_ctx->readtokval);
+        pv = (value_t *)ptrhash_bp(&fl_ctx->readstate->gensyms, (void *)fl_ctx->readtokval);
         if (*pv == (value_t)HT_NOTFOUND)
             *pv = fl_gensym(fl_ctx, NULL, 0);
         return *pv;
-    case TOK_DOUBLEQUOTE:
-        return read_string(fl_ctx);
+    case TOK_DOUBLEQUOTE: return read_string(fl_ctx);
     }
     return FL_UNSPECIFIED(fl_ctx);
 }

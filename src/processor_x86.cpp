@@ -9,45 +9,39 @@ extern "C" JL_DLLEXPORT void jl_cpuid(int32_t CPUInfo[4], int32_t InfoType)
 #if defined _MSC_VER
     __cpuid(CPUInfo, InfoType);
 #else
-    asm volatile (
+    asm volatile(
 #if defined(__i386__) && defined(__PIC__)
         "xchg %%ebx, %%esi;"
         "cpuid;"
-        "xchg %%esi, %%ebx;" :
-        "=S" (CPUInfo[1]),
+        "xchg %%esi, %%ebx;"
+        : "=S"(CPUInfo[1]),
 #else
-        "cpuid" :
-        "=b" (CPUInfo[1]),
+        "cpuid"
+        : "=b"(CPUInfo[1]),
 #endif
-        "=a" (CPUInfo[0]),
-        "=c" (CPUInfo[2]),
-        "=d" (CPUInfo[3]) :
-        "a" (InfoType)
-        );
+          "=a"(CPUInfo[0]), "=c"(CPUInfo[2]), "=d"(CPUInfo[3])
+        : "a"(InfoType));
 #endif
 }
 
-extern "C" JL_DLLEXPORT void jl_cpuidex(int32_t CPUInfo[4], int32_t InfoType, int32_t subInfoType)
+extern "C" JL_DLLEXPORT void jl_cpuidex(int32_t CPUInfo[4], int32_t InfoType,
+                                        int32_t subInfoType)
 {
 #if defined _MSC_VER
     __cpuidex(CPUInfo, InfoType, subInfoType);
 #else
-    asm volatile (
+    asm volatile(
 #if defined(__i386__) && defined(__PIC__)
         "xchg %%ebx, %%esi;"
         "cpuid;"
-        "xchg %%esi, %%ebx;" :
-        "=S" (CPUInfo[1]),
+        "xchg %%esi, %%ebx;"
+        : "=S"(CPUInfo[1]),
 #else
-        "cpuid" :
-        "=b" (CPUInfo[1]),
+        "cpuid"
+        : "=b"(CPUInfo[1]),
 #endif
-        "=a" (CPUInfo[0]),
-        "=c" (CPUInfo[2]),
-        "=d" (CPUInfo[3]) :
-        "a" (InfoType),
-        "c" (subInfoType)
-        );
+          "=a"(CPUInfo[0]), "=c"(CPUInfo[2]), "=d"(CPUInfo[3])
+        : "a"(InfoType), "c"(subInfoType));
 #endif
 }
 
@@ -122,38 +116,38 @@ enum : uint32_t {
 #undef JL_FEATURE_DEF
 };
 #undef JL_FEATURE_DEF_NAME
-static constexpr FeatureDep deps[] = {
-    {ssse3, sse3},
-    {fma, avx},
-    {sse41, ssse3},
-    {sse42, sse41},
-    {avx, sse42},
-    {f16c, avx},
-    {avx2, avx},
-    {avx512f, avx2},
-    {avx512dq, avx512f},
-    {avx512ifma, avx512f},
-    {avx512pf, avx512f},
-    {avx512er, avx512f},
-    {avx512cd, avx512f},
-    {avx512bw, avx512f},
-    {avx512vl, avx512f},
-    {avx512vbmi, avx512bw},
-    {avx512vpopcntdq, avx512f},
-    {sse4a, sse3},
-    {xop, fma4},
-    {fma4, avx},
-    {fma4, sse4a}
-};
+static constexpr FeatureDep deps[] = {{ssse3, sse3},
+                                      {fma, avx},
+                                      {sse41, ssse3},
+                                      {sse42, sse41},
+                                      {avx, sse42},
+                                      {f16c, avx},
+                                      {avx2, avx},
+                                      {avx512f, avx2},
+                                      {avx512dq, avx512f},
+                                      {avx512ifma, avx512f},
+                                      {avx512pf, avx512f},
+                                      {avx512er, avx512f},
+                                      {avx512cd, avx512f},
+                                      {avx512bw, avx512f},
+                                      {avx512vl, avx512f},
+                                      {avx512vbmi, avx512bw},
+                                      {avx512vpopcntdq, avx512f},
+                                      {sse4a, sse3},
+                                      {xop, fma4},
+                                      {fma4, avx},
+                                      {fma4, sse4a}};
 
 // We require cx16 on 64bit by default. This can be overwritten with `-cx16`
-// This isn't really compatible with 32bit but we mask it off there with required LLVM version
+// This isn't really compatible with 32bit but we mask it off there with required LLVM
+// version
 constexpr auto generic = get_feature_masks(cx16);
 constexpr auto bonnell = get_feature_masks(sse3, ssse3, cx16, movbe, sahf);
-constexpr auto silvermont = bonnell | get_feature_masks(sse41, sse42, popcnt,
-                                                        pclmul, aes, prfchw);
-constexpr auto goldmont = silvermont | get_feature_masks(mpx, sha, rdrnd, rdseed, xsave,
-                                                         xsaveopt, xsavec, xsaves, clflushopt);
+constexpr auto silvermont =
+    bonnell | get_feature_masks(sse41, sse42, popcnt, pclmul, aes, prfchw);
+constexpr auto goldmont =
+    silvermont |
+    get_feature_masks(mpx, sha, rdrnd, rdseed, xsave, xsaveopt, xsavec, xsaves, clflushopt);
 constexpr auto yonah = get_feature_masks(sse3);
 constexpr auto prescott = yonah;
 constexpr auto core2 = get_feature_masks(sse3, ssse3, cx16, sahf);
@@ -167,21 +161,21 @@ constexpr auto haswell = ivybridge | get_feature_masks(avx2, bmi, bmi2, fma, lzc
 constexpr auto broadwell = haswell | get_feature_masks(adx, rdseed, prfchw);
 constexpr auto skylake = broadwell | get_feature_masks(mpx, rtm, xsavec, xsaves,
                                                        clflushopt); // ignore sgx; hle
-constexpr auto knl = broadwell | get_feature_masks(avx512f, avx512er, avx512cd, avx512pf,
-                                                   prefetchwt1);
-constexpr auto skx = skylake | get_feature_masks(avx512f, avx512cd, avx512dq, avx512bw, avx512vl,
-                                                 pku, clwb);
+constexpr auto knl =
+    broadwell | get_feature_masks(avx512f, avx512er, avx512cd, avx512pf, prefetchwt1);
+constexpr auto skx =
+    skylake | get_feature_masks(avx512f, avx512cd, avx512dq, avx512bw, avx512vl, pku, clwb);
 constexpr auto cannonlake = skx | get_feature_masks(avx512vbmi, avx512ifma, sha);
 
 constexpr auto k8_sse3 = get_feature_masks(sse3, cx16);
 constexpr auto amdfam10 = k8_sse3 | get_feature_masks(sse4a, lzcnt, popcnt, sahf);
 
 constexpr auto btver1 = amdfam10 | get_feature_masks(ssse3, prfchw);
-constexpr auto btver2 = btver1 | get_feature_masks(sse41, sse42, avx, aes, pclmul, bmi, f16c,
-                                                   movbe, xsave, xsaveopt);
+constexpr auto btver2 = btver1 | get_feature_masks(sse41, sse42, avx, aes, pclmul, bmi,
+                                                   f16c, movbe, xsave, xsaveopt);
 
-constexpr auto bdver1 = amdfam10 | get_feature_masks(xop, fma4, avx, ssse3, sse41, sse42, aes,
-                                                     prfchw, pclmul, xsave, lwp);
+constexpr auto bdver1 = amdfam10 | get_feature_masks(xop, fma4, avx, ssse3, sse41, sse42,
+                                                     aes, prfchw, pclmul, xsave, lwp);
 constexpr auto bdver2 = bdver1 | get_feature_masks(f16c, bmi, tbm, fma);
 constexpr auto bdver3 = bdver2 | get_feature_masks(xsaveopt, fsgsbase);
 constexpr auto bdver4 = bdver3 | get_feature_masks(avx2, bmi2, mwaitx);
@@ -248,7 +242,7 @@ static uint64_t get_xcr0(void)
     return _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
 #else
     uint32_t eax, edx;
-    asm volatile ("xgetbv" : "=a" (eax), "=d" (edx) : "c" (0));
+    asm volatile("xgetbv" : "=a"(eax), "=d"(edx) : "c"(0));
     return (uint64_t(edx) << 32) | eax;
 #endif
 }
@@ -261,23 +255,23 @@ static CPU get_intel_processor_name(uint32_t family, uint32_t model, uint32_t br
     switch (family) {
     case 3:
     case 4:
-    case 5:
-        return CPU::generic;
+    case 5: return CPU::generic;
     case 6:
         switch (model) {
         case 0x01: // Pentium Pro processor
         case 0x03: // Intel Pentium II OverDrive processor, Pentium II processor, model 03
         case 0x05: // Pentium II processor, model 05, Pentium II Xeon processor,
-            // model 05, and Intel Celeron processor, model 05
+                   // model 05, and Intel Celeron processor, model 05
         case 0x06: // Celeron processor, model 06
-        case 0x07: // Pentium III processor, model 07, and Pentium III Xeon processor, model 07
+        case 0x07: // Pentium III processor, model 07, and Pentium III Xeon processor, model
+                   // 07
         case 0x08: // Pentium III processor, model 08, Pentium III Xeon processor,
-            // model 08, and Celeron processor, model 08
+                   // model 08, and Celeron processor, model 08
         case 0x0a: // Pentium III Xeon processor, model 0Ah
         case 0x0b: // Pentium III processor, model 0Bh
         case 0x09: // Intel Pentium M processor, Intel Celeron M processor model 09.
         case 0x0d: // Intel Pentium M processor, Intel Celeron M processor, model
-            // 0Dh. All processors are manufactured using the 90 nm process.
+                   // 0Dh. All processors are manufactured using the 90 nm process.
         case 0x15: // Intel EP80579 Integrated Processor and Intel EP80579
             // Integrated Processor with Intel QuickAssist Technology
             return CPU::generic;
@@ -285,36 +279,35 @@ static CPU get_intel_processor_name(uint32_t family, uint32_t model, uint32_t br
             // 0Eh. All processors are manufactured using the 65 nm process.
             return CPU::intel_yonah;
         case 0x0f: // Intel Core 2 Duo processor, Intel Core 2 Duo mobile
-            // processor, Intel Core 2 Quad processor, Intel Core 2 Quad
-            // mobile processor, Intel Core 2 Extreme processor, Intel
-            // Pentium Dual-Core processor, Intel Xeon processor, model
-            // 0Fh. All processors are manufactured using the 65 nm process.
+                   // processor, Intel Core 2 Quad processor, Intel Core 2 Quad
+                   // mobile processor, Intel Core 2 Extreme processor, Intel
+                   // Pentium Dual-Core processor, Intel Xeon processor, model
+                   // 0Fh. All processors are manufactured using the 65 nm process.
         case 0x16: // Intel Celeron processor model 16h. All processors are
             // manufactured using the 65 nm process
             return CPU::intel_core2;
         case 0x17: // Intel Core 2 Extreme processor, Intel Xeon processor, model
-            // 17h. All processors are manufactured using the 45 nm process.
-            //
-            // 45nm: Penryn , Wolfdale, Yorkfield (XE)
+                   // 17h. All processors are manufactured using the 45 nm process.
+                   //
+                   // 45nm: Penryn , Wolfdale, Yorkfield (XE)
         case 0x1d: // Intel Xeon processor MP. All processors are manufactured using
             // the 45 nm process.
             return CPU::intel_core2_penryn;
         case 0x1a: // Intel Core i7 processor and Intel Xeon processor. All
-            // processors are manufactured using the 45 nm process.
+                   // processors are manufactured using the 45 nm process.
         case 0x1e: // Intel(R) Core(TM) i7 CPU         870  @ 2.93GHz.
-            // As found in a Summer 2010 model iMac.
+                   // As found in a Summer 2010 model iMac.
         case 0x1f:
         case 0x2e: // Nehalem EX
             return CPU::intel_corei7_nehalem;
         case 0x25: // Intel Core i7, laptop version.
         case 0x2c: // Intel Core i7 processor and Intel Xeon processor. All
-            // processors are manufactured using the 32 nm process.
+                   // processors are manufactured using the 32 nm process.
         case 0x2f: // Westmere EX
             return CPU::intel_corei7_westmere;
         case 0x2a: // Intel Core i7 processor. All processors are manufactured
-            // using the 32 nm process.
-        case 0x2d:
-            return CPU::intel_corei7_sandybridge;
+                   // using the 32 nm process.
+        case 0x2d: return CPU::intel_corei7_sandybridge;
         case 0x3a:
         case 0x3e: // Ivy Bridge EP
             return CPU::intel_corei7_ivybridge;
@@ -341,8 +334,7 @@ static CPU get_intel_processor_name(uint32_t family, uint32_t model, uint32_t br
             return CPU::intel_corei7_skylake;
 
             // Skylake Xeon:
-        case 0x55:
-            return CPU::intel_corei7_skylake;
+        case 0x55: return CPU::intel_corei7_skylake;
 
         case 0x1c: // Most 45 nm Intel Atom processors
         case 0x26: // 45 nm Atom Lincroft
@@ -362,41 +354,37 @@ static CPU get_intel_processor_name(uint32_t family, uint32_t model, uint32_t br
 
             // Goldmont:
         case 0x5c:
-        case 0x5f:
-            return CPU::intel_atom_goldmont;
+        case 0x5f: return CPU::intel_atom_goldmont;
 
-        case 0x57:
-            return CPU::intel_knights_landing;
+        case 0x57: return CPU::intel_knights_landing;
 
-        default:
-            return CPU::generic;
+        default: return CPU::generic;
         }
         break;
     case 15: {
         switch (model) {
         case 0: // Pentium 4 processor, Intel Xeon processor. All processors are
-            // model 00h and manufactured using the 0.18 micron process.
+                // model 00h and manufactured using the 0.18 micron process.
         case 1: // Pentium 4 processor, Intel Xeon processor, Intel Xeon
-            // processor MP, and Intel Celeron processor. All processors are
-            // model 01h and manufactured using the 0.18 micron process.
+                // processor MP, and Intel Celeron processor. All processors are
+                // model 01h and manufactured using the 0.18 micron process.
         case 2: // Pentium 4 processor, Mobile Intel Pentium 4 processor - M,
-            // Intel Xeon processor, Intel Xeon processor MP, Intel Celeron
-            // processor, and Mobile Intel Celeron processor. All processors
-            // are model 02h and manufactured using the 0.13 micron process.
-        default:
-            return CPU::generic;
+                // Intel Xeon processor, Intel Xeon processor MP, Intel Celeron
+                // processor, and Mobile Intel Celeron processor. All processors
+                // are model 02h and manufactured using the 0.13 micron process.
+        default: return CPU::generic;
 
         case 3: // Pentium 4 processor, Intel Xeon processor, Intel Celeron D
-            // processor. All processors are model 03h and manufactured using
-            // the 90 nm process.
+                // processor. All processors are model 03h and manufactured using
+                // the 90 nm process.
         case 4: // Pentium 4 processor, Pentium 4 processor Extreme Edition,
-            // Pentium D processor, Intel Xeon processor, Intel Xeon
-            // processor MP, Intel Celeron D processor. All processors are
-            // model 04h and manufactured using the 90 nm process.
+                // Pentium D processor, Intel Xeon processor, Intel Xeon
+                // processor MP, Intel Celeron D processor. All processors are
+                // model 04h and manufactured using the 90 nm process.
         case 6: // Pentium 4 processor, Pentium D processor, Pentium processor
-            // Extreme Edition, Intel Xeon processor, Intel Xeon processor
-            // MP, Intel Celeron D processor. All processors are model 06h
-            // and manufactured using the 65 nm process.
+                // Extreme Edition, Intel Xeon processor, Intel Xeon processor
+                // MP, Intel Celeron D processor. All processors are model 06h
+                // and manufactured using the 65 nm process.
 #ifdef _CPU_X86_64_
             return CPU::intel_nocona;
 #else
@@ -404,8 +392,7 @@ static CPU get_intel_processor_name(uint32_t family, uint32_t model, uint32_t br
 #endif
         }
     }
-    default:
-        break; /*"generic"*/
+    default: break; /*"generic"*/
     }
     return CPU::generic;
 }
@@ -416,30 +403,23 @@ static CPU get_amd_processor_name(uint32_t family, uint32_t model, const uint32_
     case 4:
     case 5:
     case 6:
-    default:
-        return CPU::generic;
+    default: return CPU::generic;
     case 15:
         if (test_nbit(features, Feature::sse3))
             return CPU::amd_k8_sse3;
         switch (model) {
-        case 1:
-            return CPU::amd_opteron;
-        case 5:
-            return CPU::amd_athlon_fx;
-        default:
-            return CPU::amd_athlon_64;
+        case 1: return CPU::amd_opteron;
+        case 5: return CPU::amd_athlon_fx;
+        default: return CPU::amd_athlon_64;
         }
     case 16:
         switch (model) {
-        case 2:
-            return CPU::amd_barcelona;
+        case 2: return CPU::amd_barcelona;
         case 4:
         case 8:
-        default:
-            return CPU::amd_fam10h;
+        default: return CPU::amd_fam10h;
         }
-    case 20:
-        return CPU::amd_btver1;
+    case 20: return CPU::amd_btver1;
     case 21:
         if (!test_nbit(features, Feature::avx))
             return CPU::amd_btver1;
@@ -475,11 +455,11 @@ template<typename T>
 static inline void features_disable_avx(T &features)
 {
     using namespace Feature;
-    unset_bits(features, avx, Feature::fma, f16c, xsave, avx2, xop, fma4,
-               xsaveopt, xsavec, xsaves);
+    unset_bits(features, avx, Feature::fma, f16c, xsave, avx2, xop, fma4, xsaveopt, xsavec,
+               xsaves);
 }
 
-static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu(void)
+static NOINLINE std::pair<uint32_t, FeatureList<feature_sz>> _get_host_cpu(void)
 {
     FeatureList<feature_sz> features = {};
 
@@ -495,7 +475,7 @@ static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu(void)
     auto brand_id = info1[1] & 0xff;
 
     auto family = (info1[0] >> 8) & 0xf; // Bits 8 - 11
-    auto model = (info1[0] >> 4) & 0xf;  // Bits 4 - 7
+    auto model = (info1[0] >> 4) & 0xf; // Bits 4 - 7
     if (family == 6 || family == 0xf) {
         if (family == 0xf)
             // Examine extended family ID if family ID is F.
@@ -565,18 +545,18 @@ static NOINLINE std::pair<uint32_t,FeatureList<feature_sz>> _get_host_cpu(void)
     return std::make_pair(cpu, features);
 }
 
-static inline const std::pair<uint32_t,FeatureList<feature_sz>> &get_host_cpu()
+static inline const std::pair<uint32_t, FeatureList<feature_sz>> &get_host_cpu()
 {
     static auto host_cpu = _get_host_cpu();
     return host_cpu;
 }
 
-static inline const CPUSpec<CPU,feature_sz> *find_cpu(uint32_t cpu)
+static inline const CPUSpec<CPU, feature_sz> *find_cpu(uint32_t cpu)
 {
     return ::find_cpu(cpu, cpus, ncpu_names);
 }
 
-static inline const CPUSpec<CPU,feature_sz> *find_cpu(llvm::StringRef name)
+static inline const CPUSpec<CPU, feature_sz> *find_cpu(llvm::StringRef name)
 {
     return ::find_cpu(name, cpus, ncpu_names);
 }
@@ -588,10 +568,9 @@ static inline const char *find_cpu_name(uint32_t cpu)
 
 static inline const std::string &host_cpu_name()
 {
-    static std::string name =
-        (CPU)get_host_cpu().first != CPU::generic ?
-        std::string(find_cpu_name(get_host_cpu().first)) :
-        jl_get_cpu_name_llvm();
+    static std::string name = (CPU)get_host_cpu().first != CPU::generic ?
+                                  std::string(find_cpu_name(get_host_cpu().first)) :
+                                  jl_get_cpu_name_llvm();
     return name;
 }
 
@@ -614,7 +593,8 @@ static inline const char *normalize_cpu_name(llvm::StringRef name)
     if (name == "skx")
         return "skylake-avx512";
 #ifdef _CPU_X86_
-    // i686 isn't a supported target but it's a common default one so just make it mean pentium4.
+    // i686 isn't a supported target but it's a common default one so just make it mean
+    // pentium4.
     if (name == "pentium4" || name == "i686")
         return "generic";
 #else
@@ -638,7 +618,7 @@ static inline void disable_depends(FeatureList<n> &features)
 
 static const std::vector<TargetData<feature_sz>> &get_cmdline_targets(void)
 {
-    auto feature_cb = [] (const char *str, size_t len, FeatureList<feature_sz> &list) {
+    auto feature_cb = [](const char *str, size_t len, FeatureList<feature_sz> &list) {
         auto fbit = find_feature_bit(feature_names, nfeature_names, str, len);
         if (fbit == (uint32_t)-1)
             return false;
@@ -646,7 +626,7 @@ static const std::vector<TargetData<feature_sz>> &get_cmdline_targets(void)
         return true;
     };
     auto &targets = ::get_cmdline_targets<feature_sz>(feature_cb);
-    for (auto &t: targets) {
+    for (auto &t : targets) {
         if (auto nname = normalize_cpu_name(t.name)) {
             t.name = nname;
         }
@@ -656,7 +636,8 @@ static const std::vector<TargetData<feature_sz>> &get_cmdline_targets(void)
 
 static std::vector<TargetData<feature_sz>> jit_targets;
 
-static TargetData<feature_sz> arg_target_data(const TargetData<feature_sz> &arg, bool require_host)
+static TargetData<feature_sz> arg_target_data(const TargetData<feature_sz> &arg,
+                                              bool require_host)
 {
     TargetData<feature_sz> res = arg;
     const FeatureList<feature_sz> *cpu_features = nullptr;
@@ -677,7 +658,8 @@ static TargetData<feature_sz> arg_target_data(const TargetData<feature_sz> &arg,
     }
     enable_depends(res.en.features);
     // Mask our rdrand/rdseed/rtm/xsaveopt features that LLVM doesn't use and rr disables
-    unset_bits(res.en.features, Feature::rdrnd, Feature::rdseed, Feature::rtm, Feature::xsaveopt);
+    unset_bits(res.en.features, Feature::rdrnd, Feature::rdseed, Feature::rtm,
+               Feature::xsaveopt);
     for (size_t i = 0; i < feature_sz; i++)
         res.en.features[i] &= ~res.dis.features[i];
     if (require_host) {
@@ -711,15 +693,16 @@ static uint32_t sysimg_init_cb(const void *id)
     auto &cmdline = get_cmdline_targets();
     TargetData<feature_sz> target = arg_target_data(cmdline[0], true);
     // Then find the best match in the sysimg
-    auto sysimg = deserialize_target_data<feature_sz>((const uint8_t*)id);
+    auto sysimg = deserialize_target_data<feature_sz>((const uint8_t *)id);
     // We translate `generic` to `pentium4` or `x86-64` before sending it to LLVM
     // (see `get_llvm_target_noext`) which will be serialized into the sysimg target data.
     // Translate them back so we can actually match them.
     // We also track to see if the sysimg allows -cx16, however if the user does
     // something silly like add +cx16 on a 32bit target, we want to disable this
     // check, hence the pointer size check.
-    bool sysimg_allows_no_cx16 = sizeof(void *) == 4;;
-    for (auto &t: sysimg) {
+    bool sysimg_allows_no_cx16 = sizeof(void *) == 4;
+    ;
+    for (auto &t : sysimg) {
         if (auto nname = normalize_cpu_name(t.name)) {
             t.name = nname;
         }
@@ -755,7 +738,7 @@ static void ensure_jit_target(bool imaging)
     check_cmdline(cmdline, imaging);
     if (!jit_targets.empty())
         return;
-    for (auto &arg: cmdline) {
+    for (auto &arg : cmdline) {
         auto data = arg_target_data(arg, jit_targets.empty());
         jit_targets.push_back(std::move(data));
     }
@@ -776,22 +759,30 @@ static void ensure_jit_target(bool imaging)
             }
         }
         static constexpr uint32_t clone_math[] = {Feature::fma, Feature::fma4};
-        static constexpr uint32_t clone_simd[] = {Feature::sse3, Feature::ssse3,
-                                                  Feature::sse41, Feature::sse42,
-                                                  Feature::avx, Feature::avx2,
-                                                  Feature::sse4a, Feature::avx512f,
-                                                  Feature::avx512dq, Feature::avx512ifma,
-                                                  Feature::avx512pf, Feature::avx512er,
-                                                  Feature::avx512cd, Feature::avx512bw,
-                                                  Feature::avx512vl, Feature::avx512vbmi,
+        static constexpr uint32_t clone_simd[] = {Feature::sse3,
+                                                  Feature::ssse3,
+                                                  Feature::sse41,
+                                                  Feature::sse42,
+                                                  Feature::avx,
+                                                  Feature::avx2,
+                                                  Feature::sse4a,
+                                                  Feature::avx512f,
+                                                  Feature::avx512dq,
+                                                  Feature::avx512ifma,
+                                                  Feature::avx512pf,
+                                                  Feature::avx512er,
+                                                  Feature::avx512cd,
+                                                  Feature::avx512bw,
+                                                  Feature::avx512vl,
+                                                  Feature::avx512vbmi,
                                                   Feature::avx512vpopcntdq};
-        for (auto fe: clone_math) {
+        for (auto fe : clone_math) {
             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
                 t.en.flags |= JL_TARGET_CLONE_MATH;
                 break;
             }
         }
-        for (auto fe: clone_simd) {
+        for (auto fe : clone_simd) {
             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
                 t.en.flags |= JL_TARGET_CLONE_SIMD;
                 break;
@@ -800,7 +791,7 @@ static void ensure_jit_target(bool imaging)
     }
 }
 
-static std::pair<std::string,std::vector<std::string>>
+static std::pair<std::string, std::vector<std::string>>
 get_llvm_target_noext(const TargetData<feature_sz> &data)
 {
     std::string name = data.name;
@@ -820,7 +811,7 @@ get_llvm_target_noext(const TargetData<feature_sz> &data)
 #endif
     }
     std::vector<std::string> features;
-    for (auto &fename: feature_names) {
+    for (auto &fename : feature_names) {
         if (fename.llvmver > JL_LLVM_VERSION)
             continue;
         if (test_nbit(data.en.features, fename.bit)) {
@@ -836,7 +827,7 @@ get_llvm_target_noext(const TargetData<feature_sz> &data)
     return std::make_pair(std::move(name), std::move(features));
 }
 
-static std::pair<std::string,std::vector<std::string>>
+static std::pair<std::string, std::vector<std::string>>
 get_llvm_target_vec(const TargetData<feature_sz> &data)
 {
     auto res0 = get_llvm_target_noext(data);
@@ -844,7 +835,7 @@ get_llvm_target_vec(const TargetData<feature_sz> &data)
     return res0;
 }
 
-static std::pair<std::string,std::string>
+static std::pair<std::string, std::string>
 get_llvm_target_str(const TargetData<feature_sz> &data)
 {
     auto res0 = get_llvm_target_noext(data);
@@ -859,8 +850,8 @@ using namespace X86;
 
 JL_DLLEXPORT void jl_dump_host_cpu(void)
 {
-    dump_cpu_spec(get_host_cpu().first, get_host_cpu().second, feature_names, nfeature_names,
-                  cpus, ncpu_names);
+    dump_cpu_spec(get_host_cpu().first, get_host_cpu().second, feature_names,
+                  nfeature_names, cpus, ncpu_names);
 }
 
 JL_DLLEXPORT jl_value_t *jl_get_cpu_name(void)
@@ -875,17 +866,18 @@ jl_sysimg_fptrs_t jl_init_processor_sysimg(void *hdl)
     return parse_sysimg(hdl, sysimg_init_cb);
 }
 
-std::pair<std::string,std::vector<std::string>> jl_get_llvm_target(bool imaging, uint32_t &flags)
+std::pair<std::string, std::vector<std::string>> jl_get_llvm_target(bool imaging,
+                                                                    uint32_t &flags)
 {
     ensure_jit_target(imaging);
     flags = jit_targets[0].en.flags;
     return get_llvm_target_vec(jit_targets[0]);
 }
 
-const std::pair<std::string,std::string> &jl_get_llvm_disasm_target(void)
+const std::pair<std::string, std::string> &jl_get_llvm_disasm_target(void)
 {
-    static const auto res = get_llvm_target_str(TargetData<feature_sz>{"generic", "",
-            {feature_masks, 0}, {{}, 0}, 0});
+    static const auto res = get_llvm_target_str(
+        TargetData<feature_sz>{"generic", "", {feature_masks, 0}, {{}, 0}, 0});
     return res;
 }
 
@@ -894,10 +886,10 @@ std::vector<jl_target_spec_t> jl_get_llvm_clone_targets(void)
     if (jit_targets.empty())
         jl_error("JIT targets not initialized");
     std::vector<jl_target_spec_t> res;
-    for (auto &target: jit_targets) {
+    for (auto &target : jit_targets) {
         auto features_en = target.en.features;
         auto features_dis = target.dis.features;
-        for (auto &fename: feature_names) {
+        for (auto &fename : feature_names) {
             if (fename.llvmver > JL_LLVM_VERSION) {
                 unset_bits(features_en, fename.bit);
                 unset_bits(features_dis, fename.bit);
@@ -924,7 +916,8 @@ extern "C" int jl_test_cpu_feature(jl_cpu_feature_t feature)
 
 // -- set/clear the FZ/DAZ flags on x86 & x86-64 --
 
-// Cache of information recovered from `cpuid` since executing `cpuid` it at runtime is slow.
+// Cache of information recovered from `cpuid` since executing `cpuid` it at runtime is
+// slow.
 static uint32_t subnormal_flags = [] {
     int32_t info[4];
     jl_cpuid(info, 0);

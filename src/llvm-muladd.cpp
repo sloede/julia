@@ -7,14 +7,14 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
-#include <llvm/IR/Value.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Operator.h>
-#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Value.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/Debug.h>
 
@@ -36,8 +36,7 @@ using namespace llvm;
 
 struct CombineMulAdd : public FunctionPass {
     static char ID;
-    CombineMulAdd() : FunctionPass(ID)
-    {}
+    CombineMulAdd() : FunctionPass(ID) {}
 
 private:
     bool runOnFunction(Function &F) override;
@@ -53,7 +52,8 @@ static bool checkCombine(Module *m, Instruction *addOp, Value *maybeMul, Value *
         return false;
     if (!mulOp->hasOneUse())
         return false;
-    // On 5.0+ we only need to mark the mulOp as contract and the backend will do the work for us.
+    // On 5.0+ we only need to mark the mulOp as contract and the backend will do the work
+    // for us.
     auto fmf = mulOp->getFastMathFlags();
     fmf.setAllowContract(true);
     mulOp->copyFastMathFlags(fmf);
@@ -63,7 +63,7 @@ static bool checkCombine(Module *m, Instruction *addOp, Value *maybeMul, Value *
 bool CombineMulAdd::runOnFunction(Function &F)
 {
     Module *m = F.getParent();
-    for (auto &BB: F) {
+    for (auto &BB : F) {
         for (auto it = BB.begin(); it != BB.end();) {
             auto &I = *it;
             it++;
@@ -82,8 +82,7 @@ bool CombineMulAdd::runOnFunction(Function &F)
                     checkCombine(m, &I, I.getOperand(1), I.getOperand(0), true, true);
                 break;
             }
-            default:
-                break;
+            default: break;
             }
         }
     }

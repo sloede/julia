@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 #include "libsupport.h"
-#include <stdlib.h>
 #include <locale.h>
+#include <stdlib.h>
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #include <xlocale.h>
@@ -148,7 +148,7 @@ JL_DLLEXPORT double jl_strtod_c(const char *nptr, char **endptr)
     }
 
     /* This code path is used for hex floats */
-    if (*p == '0' && (*(p+1) == 'x' || *(p+1) == 'X')) {
+    if (*p == '0' && (*(p + 1) == 'x' || *(p + 1) == 'X')) {
         digits_pos = p;
         p += 2;
         /* Check that what's left begins with a digit or decimal point */
@@ -235,22 +235,17 @@ JL_DLLEXPORT double jl_strtod_c(const char *nptr, char **endptr)
         c += decimal_point_pos - digits_pos;
         memcpy(c, decimal_point, decimal_point_len);
         c += decimal_point_len;
-        memcpy(c, decimal_point_pos + 1,
-               end - (decimal_point_pos + 1));
+        memcpy(c, decimal_point_pos + 1, end - (decimal_point_pos + 1));
         c += end - (decimal_point_pos + 1);
         *c = 0;
 
         val = strtod(copy, &fail_pos);
 
-        if (fail_pos)
-        {
+        if (fail_pos) {
             if (fail_pos > decimal_point_pos)
-                fail_pos = (char *)digits_pos +
-                    (fail_pos - copy) -
-                    (decimal_point_len - 1);
+                fail_pos = (char *)digits_pos + (fail_pos - copy) - (decimal_point_len - 1);
             else
-                fail_pos = (char *)digits_pos +
-                    (fail_pos - copy);
+                fail_pos = (char *)digits_pos + (fail_pos - copy);
         }
 
         free(copy);
@@ -269,7 +264,7 @@ JL_DLLEXPORT double jl_strtod_c(const char *nptr, char **endptr)
     return val;
 
 invalid_string:
-    *endptr = (char*)nptr;
+    *endptr = (char *)nptr;
     errno = EINVAL;
     return -1.0;
 }
@@ -277,7 +272,7 @@ invalid_string:
 
 JL_DLLEXPORT float jl_strtof_c(const char *nptr, char **endptr)
 {
-    return (float) jl_strtod_c(nptr, endptr);
+    return (float)jl_strtod_c(nptr, endptr);
 }
 
 #endif

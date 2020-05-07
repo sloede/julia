@@ -2,21 +2,21 @@
 
 #include "gc.h"
 #ifndef _OS_WINDOWS_
-#  include <sys/resource.h>
+#include <sys/resource.h>
 #endif
 
 #ifdef _P64
-# ifdef _OS_WINDOWS_
-#  define MAX_STACK_MAPPINGS 500
-# else
-#  define MAX_STACK_MAPPINGS 30000
-# endif
+#ifdef _OS_WINDOWS_
+#define MAX_STACK_MAPPINGS 500
 #else
-# ifdef _OS_WINDOWS_
-#  define MAX_STACK_MAPPINGS 250
-# else
-#  define MAX_STACK_MAPPINGS 500
-# endif
+#define MAX_STACK_MAPPINGS 30000
+#endif
+#else
+#ifdef _OS_WINDOWS_
+#define MAX_STACK_MAPPINGS 250
+#else
+#define MAX_STACK_MAPPINGS 500
+#endif
 #endif
 
 // number of stacks to always keep available per pool
@@ -52,7 +52,7 @@ static void free_stack(void *stkbuf, size_t bufsz)
 
 static void *malloc_stack(size_t bufsz) JL_NOTSAFEPOINT
 {
-    void* stk = mmap(0, bufsz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void *stk = mmap(0, bufsz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (stk == MAP_FAILED)
         return MAP_FAILED;
 #if !defined(JL_HAVE_UCONTEXT) && !defined(JL_HAVE_SIGALTSTACK)
@@ -75,25 +75,14 @@ static void free_stack(void *stkbuf, size_t bufsz)
 
 
 const unsigned pool_sizes[] = {
-    128 * 1024,
-    192 * 1024,
-    256 * 1024,
-    384 * 1024,
-    512 * 1024,
-    768 * 1024,
-    1024 * 1024,
-    1537 * 1024,
-    2048 * 1024,
-    3 * 1024 * 1024,
-    4 * 1024 * 1024,
-    6 * 1024 * 1024,
-    8 * 1024 * 1024,
-    12 * 1024 * 1024,
-    16 * 1024 * 1024,
-    24 * 1024 * 1024,
+    128 * 1024,      192 * 1024,       256 * 1024,       384 * 1024,
+    512 * 1024,      768 * 1024,       1024 * 1024,      1537 * 1024,
+    2048 * 1024,     3 * 1024 * 1024,  4 * 1024 * 1024,  6 * 1024 * 1024,
+    8 * 1024 * 1024, 12 * 1024 * 1024, 16 * 1024 * 1024, 24 * 1024 * 1024,
 };
 
-static_assert(sizeof(pool_sizes) == JL_N_STACK_POOLS * sizeof(pool_sizes[0]), "JL_N_STACK_POOLS size mismatch");
+static_assert(sizeof(pool_sizes) == JL_N_STACK_POOLS * sizeof(pool_sizes[0]),
+              "JL_N_STACK_POOLS size mismatch");
 
 static unsigned select_pool(size_t nb) JL_NOTSAFEPOINT
 {
@@ -214,7 +203,7 @@ void sweep_stack_pools(void)
         if (l == 0)
             continue;
         while (1) {
-            jl_task_t *t = (jl_task_t*)lst[n];
+            jl_task_t *t = (jl_task_t *)lst[n];
             if (gc_marked(jl_astaggedvalue(t)->bits.gc)) {
                 n++;
             }

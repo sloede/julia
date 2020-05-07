@@ -27,7 +27,8 @@ extern "C" {
 JL_DLLEXPORT int16_t jl_threadid(void);
 JL_DLLEXPORT void jl_threading_profile(void);
 
-JL_DLLEXPORT JL_CONST_FUNC jl_ptls_t (jl_get_ptls_states)(void) JL_GLOBALLY_ROOTED JL_NOTSAFEPOINT;
+JL_DLLEXPORT
+    JL_CONST_FUNC jl_ptls_t(jl_get_ptls_states)(void) JL_GLOBALLY_ROOTED JL_NOTSAFEPOINT;
 
 typedef jl_ptls_t (*jl_get_ptls_states_func)(void);
 #if !defined(_OS_DARWIN_) && !defined(_OS_WINDOWS_)

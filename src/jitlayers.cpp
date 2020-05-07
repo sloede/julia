@@ -1,49 +1,50 @@
 // This file is a part of Julia. License is MIT: https://julialang.org/license
 
-// Except for parts of this file which were copied from LLVM, under the UIUC license (marked below).
+// Except for parts of this file which were copied from LLVM, under the UIUC license (marked
+// below).
 
 #include "llvm-version.h"
-#include "platform.h"
 #include "options.h"
+#include "platform.h"
 
 #include <iostream>
 #include <sstream>
 
-#include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
+#include <llvm/ADT/StringMap.h>
+#include <llvm/Support/FormattedStream.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/FormattedStream.h>
-#include <llvm/ADT/StringMap.h>
 
+#include <llvm/Analysis/TargetLibraryInfo.h>
+#include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Target/TargetMachine.h>
-#include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/Analysis/TargetLibraryInfo.h>
 
 using namespace llvm;
 
-#include "julia.h"
-#include "julia_internal.h"
 #include "codegen_shared.h"
 #include "jitlayers.h"
+#include "julia.h"
 #include "julia_assert.h"
+#include "julia_internal.h"
 
-RTDyldMemoryManager* createRTDyldMemoryManager(void);
+RTDyldMemoryManager *createRTDyldMemoryManager(void);
 
-void jl_init_jit(void) { }
+void jl_init_jit(void) {}
 
 // Snooping on which functions are being compiled, and how long it takes
 JL_STREAM *dump_compiles_stream = NULL;
-extern "C" JL_DLLEXPORT
-void jl_dump_compiles(void *s)
+extern "C" JL_DLLEXPORT void jl_dump_compiles(void *s)
 {
-    dump_compiles_stream = (JL_STREAM*)s;
+    dump_compiles_stream = (JL_STREAM *)s;
 }
 
 static void jl_add_to_ee();
-static void jl_add_to_ee(std::unique_ptr<Module> &M, StringMap<std::unique_ptr<Module>*> &NewExports);
+static void jl_add_to_ee(std::unique_ptr<Module> &M,
+                         StringMap<std::unique_ptr<Module> *> &NewExports);
 static uint64_t getAddressForFunction(StringRef fname);
 
 void jl_link_global(GlobalVariable *GV, void *addr)
@@ -55,7 +56,7 @@ void jl_link_global(GlobalVariable *GV, void *addr)
     GV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
 }
 
-void jl_jit_globals(std::map<void *, GlobalVariable*> &globals)
+void jl_jit_globals(std::map<void *, GlobalVariable *> &globals)
 {
     for (auto &global : globals) {
         jl_link_global(global.second, global.first);
@@ -66,14 +67,12 @@ void jl_jit_globals(std::map<void *, GlobalVariable*> &globals)
 // and adds the result to the jitlayers
 // (and the shadow module),
 // and generates code for it
-static jl_callptr_t _jl_compile_codeinst(
-        jl_code_instance_t *codeinst,
-        jl_code_info_t *src,
-        size_t world)
+static jl_callptr_t _jl_compile_codeinst(jl_code_instance_t *codeinst, jl_code_info_t *src,
+                                         size_t world)
 {
     // TODO: Merge with jl_dump_compiles?
     static ios_t f_precompile;
-    static JL_STREAM* s_precompile = NULL;
+    static JL_STREAM *s_precompile = NULL;
 
     // caller must hold codegen_lock
     // and have disabled finalizers
@@ -82,8 +81,9 @@ static jl_callptr_t _jl_compile_codeinst(
         start_time = jl_hrtime();
 
     assert(jl_is_code_instance(codeinst));
-    assert(codeinst->min_world <= world && (codeinst->max_world >= world || codeinst->max_world == 0) &&
-        "invalid world for method-instance");
+    assert(codeinst->min_world <= world &&
+           (codeinst->max_world >= world || codeinst->max_world == 0) &&
+           "invalid world for method-instance");
     assert(src && jl_is_code_info(src));
 
     jl_callptr_t fptr = NULL;
@@ -91,7 +91,7 @@ static jl_callptr_t _jl_compile_codeinst(
     jl_codegen_params_t params;
     params.cache = true;
     params.world = world;
-    std::map<jl_code_instance_t*, jl_compile_result_t> emitted;
+    std::map<jl_code_instance_t *, jl_compile_result_t> emitted;
     {
         JL_TIMING(CODEGEN);
         jl_compile_result_t result = jl_emit_codeinst(codeinst, src, params);
@@ -100,8 +100,8 @@ static jl_callptr_t _jl_compile_codeinst(
         jl_compile_workqueue(emitted, params, CompilationPolicy::Default);
 
         jl_add_to_ee();
-        StringMap<std::unique_ptr<Module>*> NewExports;
-        StringMap<void*> NewGlobals;
+        StringMap<std::unique_ptr<Module> *> NewExports;
+        StringMap<void *> NewGlobals;
         for (auto &global : params.globals) {
             NewGlobals[global.second->getName()] = global.first;
         }
@@ -147,16 +147,19 @@ static jl_callptr_t _jl_compile_codeinst(
             // once set, don't change invoke-ptr, as that leads to race conditions
             // with the (not) simultaneous updates to invoke and specptr
             if (!decls.specFunctionObject.empty()) {
-                this_code->specptr.fptr = (void*)getAddressForFunction(decls.specFunctionObject);
+                this_code->specptr.fptr =
+                    (void *)getAddressForFunction(decls.specFunctionObject);
                 this_code->isspecsig = isspecsig;
             }
             this_code->invoke = addr;
         }
-        else if (this_code->invoke == jl_fptr_const_return && !decls.specFunctionObject.empty()) {
+        else if (this_code->invoke == jl_fptr_const_return &&
+                 !decls.specFunctionObject.empty()) {
             // hack to export this pointer value to jl_dump_method_asm
-            this_code->specptr.fptr = (void*)getAddressForFunction(decls.specFunctionObject);
+            this_code->specptr.fptr =
+                (void *)getAddressForFunction(decls.specFunctionObject);
         }
-        if (this_code== codeinst)
+        if (this_code == codeinst)
             fptr = addr;
     }
 
@@ -170,13 +173,14 @@ static jl_callptr_t _jl_compile_codeinst(
     if (jl_is_method(mi->def.method)) {
         if (jl_options.trace_compile != NULL) {
             if (s_precompile == NULL) {
-                const char* t = jl_options.trace_compile;
+                const char *t = jl_options.trace_compile;
                 if (!strncmp(t, "stderr", 6))
                     s_precompile = JL_STDERR;
                 else {
                     if (ios_file(&f_precompile, t, 1, 1, 1, 1) == NULL)
-                        jl_errorf("cannot open precompile statement file \"%s\" for writing", t);
-                    s_precompile = (JL_STREAM*) &f_precompile;
+                        jl_errorf(
+                            "cannot open precompile statement file \"%s\" for writing", t);
+                    s_precompile = (JL_STREAM *)&f_precompile;
                 }
             }
             if (!jl_has_free_typevars(mi->specTypes)) {
@@ -197,15 +201,16 @@ static jl_callptr_t _jl_compile_codeinst(
     return fptr;
 }
 
-Function *jl_generate_ccallable(void *llvmmod, void *sysimg_handle, jl_value_t *declrt, jl_value_t *sigt, jl_codegen_params_t &params);
+Function *jl_generate_ccallable(void *llvmmod, void *sysimg_handle, jl_value_t *declrt,
+                                jl_value_t *sigt, jl_codegen_params_t &params);
 
 // compile a C-callable alias
-extern "C" JL_DLLEXPORT
-void jl_compile_extern_c(void *llvmmod, void *p, void *sysimg, jl_value_t *declrt, jl_value_t *sigt)
+extern "C" JL_DLLEXPORT void jl_compile_extern_c(void *llvmmod, void *p, void *sysimg,
+                                                 jl_value_t *declrt, jl_value_t *sigt)
 {
     JL_LOCK(&codegen_lock);
     jl_codegen_params_t params;
-    jl_codegen_params_t *pparams = (jl_codegen_params_t*)p;
+    jl_codegen_params_t *pparams = (jl_codegen_params_t *)p;
     if (pparams == NULL)
         pparams = &params;
     jl_generate_ccallable(llvmmod, sysimg, declrt, sigt, *pparams);
@@ -223,16 +228,16 @@ void jl_compile_extern_c(void *llvmmod, void *p, void *sysimg, jl_value_t *declr
 bool jl_type_mappable_to_c(jl_value_t *ty);
 
 // declare a C-callable entry point; called during code loading from the toplevel
-extern "C" JL_DLLEXPORT
-void jl_extern_c(jl_value_t *declrt, jl_tupletype_t *sigt)
+extern "C" JL_DLLEXPORT void jl_extern_c(jl_value_t *declrt, jl_tupletype_t *sigt)
 {
     // validate arguments. try to do as many checks as possible here to avoid
     // throwing errors later during codegen.
     JL_TYPECHK(@ccallable, type, declrt);
     if (!jl_is_tuple_type(sigt))
-        jl_type_error("@ccallable", (jl_value_t*)jl_anytuple_type_type, (jl_value_t*)sigt);
+        jl_type_error("@ccallable", (jl_value_t *)jl_anytuple_type_type,
+                      (jl_value_t *)sigt);
     // check that f is a guaranteed singleton type
-    jl_datatype_t *ft = (jl_datatype_t*)jl_tparam0(sigt);
+    jl_datatype_t *ft = (jl_datatype_t *)jl_tparam0(sigt);
     if (!jl_is_datatype(ft) || ft->instance == NULL)
         jl_error("@ccallable: function object must be a singleton");
 
@@ -253,37 +258,38 @@ void jl_extern_c(jl_value_t *declrt, jl_tupletype_t *sigt)
     }
 
     // save a record of this so that the alias is generated when we write an object file
-    jl_method_t *meth = (jl_method_t*)jl_methtable_lookup(ft->name->mt, (jl_value_t*)sigt, jl_world_counter);
+    jl_method_t *meth = (jl_method_t *)jl_methtable_lookup(ft->name->mt, (jl_value_t *)sigt,
+                                                           jl_world_counter);
     if (!jl_is_method(meth))
         jl_error("@ccallable: could not find requested method");
     JL_GC_PUSH1(&meth);
-    meth->ccallable = jl_svec2(declrt, (jl_value_t*)sigt);
+    meth->ccallable = jl_svec2(declrt, (jl_value_t *)sigt);
     jl_gc_wb(meth, meth->ccallable);
     JL_GC_POP();
 
     // create the alias in the current runtime environment
-    jl_compile_extern_c(NULL, NULL, NULL, declrt, (jl_value_t*)sigt);
+    jl_compile_extern_c(NULL, NULL, NULL, declrt, (jl_value_t *)sigt);
 }
 
 // this compiles li and emits fptr
-extern "C"
-jl_code_instance_t *jl_generate_fptr(jl_method_instance_t *mi JL_PROPAGATES_ROOT, size_t world)
+extern "C" jl_code_instance_t *jl_generate_fptr(jl_method_instance_t *mi JL_PROPAGATES_ROOT,
+                                                size_t world)
 {
     JL_LOCK(&codegen_lock); // also disables finalizers, to prevent any unexpected recursion
     // if we don't have any decls already, try to generate it now
     jl_code_info_t *src = NULL;
     JL_GC_PUSH1(&src);
     jl_value_t *ci = jl_rettype_inferred(mi, world, world);
-    jl_code_instance_t *codeinst = (ci == jl_nothing ? NULL : (jl_code_instance_t*)ci);
+    jl_code_instance_t *codeinst = (ci == jl_nothing ? NULL : (jl_code_instance_t *)ci);
     if (codeinst) {
-        src = (jl_code_info_t*)codeinst->inferred;
-        if ((jl_value_t*)src == jl_nothing)
+        src = (jl_code_info_t *)codeinst->inferred;
+        if ((jl_value_t *)src == jl_nothing)
             src = NULL;
         else if (jl_is_method(mi->def.method))
-            src = jl_uncompress_ir(mi->def.method, codeinst, (jl_array_t*)src);
+            src = jl_uncompress_ir(mi->def.method, codeinst, (jl_array_t *)src);
     }
     if (src == NULL && jl_is_method(mi->def.method) &&
-             jl_symbol_name(mi->def.method->name)[0] != '@') {
+        jl_symbol_name(mi->def.method->name)[0] != '@') {
         // If the caller didn't provide the source,
         // see if it is inferred, or try to infer it for ourself.
         // (but don't bother with typeinf on macros or toplevel thunks)
@@ -295,7 +301,8 @@ jl_code_instance_t *jl_generate_fptr(jl_method_instance_t *mi JL_PROPAGATES_ROOT
     }
     else if (src && jl_is_code_info(src)) {
         if (!codeinst) {
-            codeinst = jl_get_method_inferred(mi, src->rettype, src->min_world, src->max_world);
+            codeinst =
+                jl_get_method_inferred(mi, src->rettype, src->min_world, src->max_world);
             if (src->inferred && !codeinst->inferred)
                 codeinst->inferred = jl_nothing;
         }
@@ -311,8 +318,7 @@ jl_code_instance_t *jl_generate_fptr(jl_method_instance_t *mi JL_PROPAGATES_ROOT
     return codeinst;
 }
 
-extern "C"
-void jl_generate_fptr_for_unspecialized(jl_code_instance_t *unspec)
+extern "C" void jl_generate_fptr_for_unspecialized(jl_code_instance_t *unspec)
 {
     if (unspec->invoke != NULL)
         return;
@@ -322,23 +328,24 @@ void jl_generate_fptr_for_unspecialized(jl_code_instance_t *unspec)
         JL_GC_PUSH1(&src);
         jl_method_t *def = unspec->def->def.method;
         if (jl_is_method(def)) {
-            src = (jl_code_info_t*)def->source;
+            src = (jl_code_info_t *)def->source;
             if (src == NULL) {
                 // TODO: this is wrong
                 assert(def->generator);
                 // TODO: jl_code_for_staged can throw
                 src = jl_code_for_staged(unspec->def);
             }
-            if (src && (jl_value_t*)src != jl_nothing)
-                src = jl_uncompress_ir(def, NULL, (jl_array_t*)src);
+            if (src && (jl_value_t *)src != jl_nothing)
+                src = jl_uncompress_ir(def, NULL, (jl_array_t *)src);
         }
         else {
-            src = (jl_code_info_t*)unspec->def->uninferred;
+            src = (jl_code_info_t *)unspec->def->uninferred;
         }
         assert(src && jl_is_code_info(src));
         _jl_compile_codeinst(unspec, src, unspec->min_world);
         if (unspec->invoke == NULL)
-            // if we hit a codegen bug (or ran into a broken generated function or llvmcall), fall back to the interpreter as a last resort
+            // if we hit a codegen bug (or ran into a broken generated function or
+            // llvmcall), fall back to the interpreter as a last resort
             unspec->invoke = &jl_fptr_interpret_call;
         JL_GC_POP();
     }
@@ -347,9 +354,9 @@ void jl_generate_fptr_for_unspecialized(jl_code_instance_t *unspec)
 
 
 // get a native disassembly for a compiled method
-extern "C" JL_DLLEXPORT
-jl_value_t *jl_dump_method_asm(jl_method_instance_t *mi, size_t world,
-        int raw_mc, char getwrapper, const char* asm_variant, const char *debuginfo)
+extern "C" JL_DLLEXPORT jl_value_t *
+jl_dump_method_asm(jl_method_instance_t *mi, size_t world, int raw_mc, char getwrapper,
+                   const char *asm_variant, const char *debuginfo)
 {
     // printing via disassembly
     jl_code_instance_t *codeinst = jl_generate_fptr(mi, world);
@@ -361,7 +368,8 @@ jl_value_t *jl_dump_method_asm(jl_method_instance_t *mi, size_t world,
         if (fptr == (uintptr_t)&jl_fptr_const_return && specfptr == 0) {
             // normally we prevent native code from being generated for these functions,
             // so create an exception here so we can print pretty lies
-            JL_LOCK(&codegen_lock); // also disables finalizers, to prevent any unexpected recursion
+            JL_LOCK(&codegen_lock); // also disables finalizers, to prevent any unexpected
+                                    // recursion
             specfptr = (uintptr_t)codeinst->specptr.fptr;
             if (specfptr == 0) {
                 jl_code_info_t *src = jl_type_infer(mi, world, 0);
@@ -370,10 +378,11 @@ jl_value_t *jl_dump_method_asm(jl_method_instance_t *mi, size_t world,
                 if (jl_is_method(def)) {
                     if (!src) {
                         // TODO: jl_code_for_staged can throw
-                        src = def->generator ? jl_code_for_staged(mi) : (jl_code_info_t*)def->source;
+                        src = def->generator ? jl_code_for_staged(mi) :
+                                               (jl_code_info_t *)def->source;
                     }
-                    if (src && (jl_value_t*)src != jl_nothing)
-                        src = jl_uncompress_ir(mi->def.method, codeinst, (jl_array_t*)src);
+                    if (src && (jl_value_t *)src != jl_nothing)
+                        src = jl_uncompress_ir(mi->def.method, codeinst, (jl_array_t *)src);
                 }
                 fptr = (uintptr_t)codeinst->invoke;
                 specfptr = (uintptr_t)codeinst->specptr.fptr;
@@ -393,8 +402,10 @@ jl_value_t *jl_dump_method_asm(jl_method_instance_t *mi, size_t world,
 
     // whatever, that didn't work - use the assembler output instead
     if (raw_mc) // eh, give up, this flag doesn't really work anyways normally
-        return (jl_value_t*)jl_pchar_to_array("", 0);
-    return jl_dump_llvm_asm(jl_get_llvmf_defn(mi, world, getwrapper, true, jl_default_cgparams), asm_variant, debuginfo);
+        return (jl_value_t *)jl_pchar_to_array("", 0);
+    return jl_dump_llvm_asm(jl_get_llvmf_defn(mi, world, getwrapper, true,
+                                              jl_default_cgparams),
+                            asm_variant, debuginfo);
 }
 
 #if defined(_OS_LINUX_) || defined(_OS_WINDOWS_) || defined(_OS_FREEBSD_)
@@ -407,8 +418,7 @@ static uint64_t resolve_atomic(const char *name)
 #elif defined(_OS_WINDOWS_)
     static const char *const libatomic = "libatomic-1.dll";
 #endif
-    static void *atomic_hdl = jl_load_dynamic_library(libatomic,
-                                                      JL_RTLD_LOCAL, 0);
+    static void *atomic_hdl = jl_load_dynamic_library(libatomic, JL_RTLD_LOCAL, 0);
     static const char *const atomic_prefix = "__atomic_";
     if (!atomic_hdl)
         return 0;
@@ -423,19 +433,20 @@ static uint64_t resolve_atomic(const char *name)
 // Custom object emission notification handler for the JuliaOJIT
 extern JITEventListener *CreateJuliaJITEventListener();
 JuliaOJIT::DebugObjectRegistrar::DebugObjectRegistrar(JuliaOJIT &JIT)
-    : JuliaListener(CreateJuliaJITEventListener()),
-      JIT(JIT) {}
+  : JuliaListener(CreateJuliaJITEventListener()), JIT(JIT)
+{
+}
 
 JL_DLLEXPORT void ORCNotifyObjectEmitted(JITEventListener *Listener,
                                          const object::ObjectFile &obj,
                                          const RuntimeDyld::LoadedObjectInfo &L,
                                          RTDyldMemoryManager *memmgr);
 
-template <typename ObjT, typename LoadResult>
+template<typename ObjT, typename LoadResult>
 void JuliaOJIT::DebugObjectRegistrar::registerObject(RTDyldObjHandleT H, const ObjT &Obj,
                                                      const LoadResult &LO)
 {
-    const ObjT* Object = &Obj;
+    const ObjT *Object = &Obj;
 
     JIT.NotifyFinalizer(H, *Object, *LO);
     ORCNotifyObjectEmitted(JuliaListener.get(), *Object, *LO, JIT.MemMgr.get());
@@ -460,16 +471,15 @@ void JuliaOJIT::DebugObjectRegistrar::registerObject(RTDyldObjHandleT H, const O
         // note: calling getAddress here eagerly finalizes H
         // as an alternative, we could store the JITSymbol instead
         // (which would present a lazy-initializer functor interface instead)
-        JIT.LocalSymbolTable[Name] = (void*)(uintptr_t)cantFail(Sym.getAddress());
+        JIT.LocalSymbolTable[Name] = (void *)(uintptr_t)cantFail(Sym.getAddress());
     }
 }
 
-template <typename ObjSetT, typename LoadResult>
-void JuliaOJIT::DebugObjectRegistrar::operator()(RTDyldObjHandleT H,
-                const ObjSetT &Object, const LoadResult &LOS)
+template<typename ObjSetT, typename LoadResult>
+void JuliaOJIT::DebugObjectRegistrar::operator()(RTDyldObjHandleT H, const ObjSetT &Object,
+                                                 const LoadResult &LOS)
 {
-    registerObject(H, Object,
-                   static_cast<const RuntimeDyld::LoadedObjectInfo*>(&LOS));
+    registerObject(H, Object, static_cast<const RuntimeDyld::LoadedObjectInfo *>(&LOS));
 }
 
 CodeGenOpt::Level CodeGenOptLevelFor(int optlevel)
@@ -478,12 +488,13 @@ CodeGenOpt::Level CodeGenOptLevelFor(int optlevel)
     return CodeGenOpt::None;
 #else
     return optlevel < 2 ? CodeGenOpt::None :
-        optlevel == 2 ? CodeGenOpt::Default :
-        CodeGenOpt::Aggressive;
+                          optlevel == 2 ? CodeGenOpt::Default : CodeGenOpt::Aggressive;
 #endif
 }
 
-static void addPassesForOptLevel(legacy::PassManager &PM, TargetMachine &TM, raw_svector_ostream &ObjStream, MCContext *Ctx, int optlevel)
+static void addPassesForOptLevel(legacy::PassManager &PM, TargetMachine &TM,
+                                 raw_svector_ostream &ObjStream, MCContext *Ctx,
+                                 int optlevel)
 {
     addTargetPasses(&PM, &TM);
     addOptimizationPasses(&PM, optlevel);
@@ -531,8 +542,10 @@ CompilerResultT JuliaOJIT::CompilerT::operator()(Module &M)
         raw_string_ostream OS(Buf);
         logAllUnhandledErrors(Obj.takeError(), OS, "");
         OS.flush();
-        llvm::report_fatal_error("FATAL: Unable to compile LLVM Module: '" + Buf + "'\n"
-                                 "The module's content was printed above. Please file a bug report");
+        llvm::report_fatal_error(
+            "FATAL: Unable to compile LLVM Module: '" + Buf +
+            "'\n"
+            "The module's content was printed above. Please file a bug report");
     }
 
     return CompilerResultT(std::move(ObjBuffer));
@@ -546,34 +559,25 @@ JuliaOJIT::JuliaOJIT(TargetMachine &TM)
     registrar(*this),
     ES(),
     SymbolResolver(llvm::orc::createLegacyLookupResolver(
-          ES,
-          [this](StringRef name) -> llvm::JITSymbol {
-            return this->resolveSymbol(name);
-          },
-          [](llvm::Error Err) {
-            cantFail(std::move(Err), "resolveSymbol failed");
-          })),
+        ES, [this](StringRef name) -> llvm::JITSymbol { return this->resolveSymbol(name); },
+        [](llvm::Error Err) { cantFail(std::move(Err), "resolveSymbol failed"); })),
     ObjectLayer(
-        AcknowledgeORCv1Deprecation,
-        ES,
+        AcknowledgeORCv1Deprecation, ES,
         [this](RTDyldObjHandleT) {
-                      ObjLayerT::Resources result;
-                      result.MemMgr = MemMgr;
-                      result.Resolver = SymbolResolver;
-                      return result;
-                    },
-        std::ref(registrar)
-        ),
-    CompileLayer(
-            AcknowledgeORCv1Deprecation,
-            ObjectLayer,
-            CompilerT(this)
-        )
+            ObjLayerT::Resources result;
+            result.MemMgr = MemMgr;
+            result.Resolver = SymbolResolver;
+            return result;
+        },
+        std::ref(registrar)),
+    CompileLayer(AcknowledgeORCv1Deprecation, ObjectLayer, CompilerT(this))
 {
     for (int i = 0; i < 4; i++) {
-        TMs[i] = TM.getTarget().createTargetMachine(TM.getTargetTriple().getTriple(), TM.getTargetCPU(),
-                TM.getTargetFeatureString(), TM.Options, Reloc::Static, TM.getCodeModel(),
-                CodeGenOptLevelFor(i), true);
+        TMs[i] = TM.getTarget().createTargetMachine(TM.getTargetTriple().getTriple(),
+                                                    TM.getTargetCPU(),
+                                                    TM.getTargetFeatureString(), TM.Options,
+                                                    Reloc::Static, TM.getCodeModel(),
+                                                    CodeGenOptLevelFor(i), true);
     }
     addPassesForOptLevel(PM0, *TMs[0], ObjStream, Ctx, 0);
     addPassesForOptLevel(PM1, *TMs[1], ObjStream, Ctx, 1);
@@ -590,7 +594,7 @@ JuliaOJIT::JuliaOJIT(TargetMachine &TM)
 
 void JuliaOJIT::addGlobalMapping(StringRef Name, uint64_t Addr)
 {
-    bool successful = GlobalSymbolTable.insert(std::make_pair(Name, (void*)Addr)).second;
+    bool successful = GlobalSymbolTable.insert(std::make_pair(Name, (void *)Addr)).second;
     (void)successful;
     assert(successful);
 }
@@ -624,7 +628,9 @@ void JuliaOJIT::addModule(std::unique_ptr<Module> M)
     }
 #ifndef JL_NDEBUG
     // validate the relocations for M
-    for (Module::global_object_iterator I = M->global_objects().begin(), E = M->global_objects().end(); I != E; ) {
+    for (Module::global_object_iterator I = M->global_objects().begin(),
+                                        E = M->global_objects().end();
+         I != E;) {
         GlobalObject *F = &*I;
         ++I;
         if (F->isDeclaration()) {
@@ -719,7 +725,7 @@ uint64_t JuliaOJIT::getFunctionAddress(StringRef Name)
 
 StringRef JuliaOJIT::getFunctionAtAddress(uint64_t Addr, jl_code_instance_t *codeinst)
 {
-    auto &fname = ReverseLocalSymbolTable[(void*)(uintptr_t)Addr];
+    auto &fname = ReverseLocalSymbolTable[(void *)(uintptr_t)Addr];
     if (fname.empty()) {
         std::stringstream stream_fname;
         // try to pick an appropriate name that describes it
@@ -735,11 +741,11 @@ StringRef JuliaOJIT::getFunctionAtAddress(uint64_t Addr, jl_code_instance_t *cod
         else {
             stream_fname << "jlsys_";
         }
-        const char* unadorned_name = jl_symbol_name(codeinst->def->def.method->name);
+        const char *unadorned_name = jl_symbol_name(codeinst->def->def.method->name);
         stream_fname << unadorned_name << "_" << globalUnique++;
         std::string string_fname = stream_fname.str();
         fname = strdup(string_fname.c_str());
-        LocalSymbolTable[getMangledName(string_fname)] = (void*)(uintptr_t)Addr;
+        LocalSymbolTable[getMangledName(string_fname)] = (void *)(uintptr_t)Addr;
     }
     return fname;
 }
@@ -752,20 +758,19 @@ void JuliaOJIT::RegisterJITEventListener(JITEventListener *L)
     EventListeners.push_back(L);
 }
 
-void JuliaOJIT::NotifyFinalizer(RTDyldObjHandleT Key,
-                                const object::ObjectFile &Obj,
+void JuliaOJIT::NotifyFinalizer(RTDyldObjHandleT Key, const object::ObjectFile &Obj,
                                 const RuntimeDyld::LoadedObjectInfo &LoadedObjectInfo)
 {
     for (auto &Listener : EventListeners)
         Listener->notifyObjectLoaded(Key, Obj, LoadedObjectInfo);
 }
 
-const DataLayout& JuliaOJIT::getDataLayout() const
+const DataLayout &JuliaOJIT::getDataLayout() const
 {
     return DL;
 }
 
-const Triple& JuliaOJIT::getTargetTriple() const
+const Triple &JuliaOJIT::getTargetTriple() const
 {
     return TM.getTargetTriple();
 }
@@ -794,7 +799,8 @@ void jl_merge_module(Module *dest, std::unique_ptr<Module> src)
     assert(dest != src.get());
     for (Module::global_iterator I = src->global_begin(), E = src->global_end(); I != E;) {
         GlobalVariable *sG = &*I;
-        GlobalVariable *dG = cast_or_null<GlobalVariable>(dest->getNamedValue(sG->getName()));
+        GlobalVariable *dG =
+            cast_or_null<GlobalVariable>(dest->getNamedValue(sG->getName()));
         ++I;
         // Replace a declaration with the definition:
         if (dG) {
@@ -845,7 +851,8 @@ void jl_merge_module(Module *dest, std::unique_ptr<Module> src)
         GlobalAlias *dG = cast_or_null<GlobalAlias>(dest->getNamedValue(sG->getName()));
         ++I;
         if (dG) {
-            if (!dG->isDeclaration()) { // aliases are always definitions, so this test is reversed from the above two
+            if (!dG->isDeclaration()) { // aliases are always definitions, so this test is
+                                        // reversed from the above two
                 sG->replaceAllUsesWith(dG);
                 sG->eraseFromParent();
                 continue;
@@ -864,7 +871,8 @@ void jl_merge_module(Module *dest, std::unique_ptr<Module> src)
     NamedMDNode *sNMD = src->getNamedMetadata("llvm.dbg.cu");
     if (sNMD) {
         NamedMDNode *dNMD = dest->getOrInsertNamedMetadata("llvm.dbg.cu");
-        for (NamedMDNode::op_iterator I = sNMD->op_begin(), E = sNMD->op_end(); I != E; ++I) {
+        for (NamedMDNode::op_iterator I = sNMD->op_begin(), E = sNMD->op_end(); I != E;
+             ++I) {
             dNMD->addOperand(*I);
         }
     }
@@ -879,15 +887,17 @@ static void jl_add_to_ee(std::unique_ptr<Module> m)
 {
     JL_TIMING(LLVM_EMIT);
 #if defined(_CPU_X86_64_) && defined(_OS_WINDOWS_)
-    // Add special values used by debuginfo to build the UnwindData table registration for Win64
+    // Add special values used by debuginfo to build the UnwindData table registration for
+    // Win64
     Type *T_uint32 = Type::getInt32Ty(m->getContext());
-    ArrayType *atype = ArrayType::get(T_uint32, 3); // want 4-byte alignment of 12-bytes of data
-    (new GlobalVariable(*m, atype,
-        false, GlobalVariable::InternalLinkage,
-        ConstantAggregateZero::get(atype), "__UnwindData"))->setSection(".text");
-    (new GlobalVariable(*m, atype,
-        false, GlobalVariable::InternalLinkage,
-        ConstantAggregateZero::get(atype), "__catchjmp"))->setSection(".text");
+    ArrayType *atype =
+        ArrayType::get(T_uint32, 3); // want 4-byte alignment of 12-bytes of data
+    (new GlobalVariable(*m, atype, false, GlobalVariable::InternalLinkage,
+                        ConstantAggregateZero::get(atype), "__UnwindData"))
+        ->setSection(".text");
+    (new GlobalVariable(*m, atype, false, GlobalVariable::InternalLinkage,
+                        ConstantAggregateZero::get(atype), "__catchjmp"))
+        ->setSection(".text");
 #endif
     assert(jl_ExecutionEngine);
     jl_ExecutionEngine->addModule(std::move(m));
@@ -911,12 +921,11 @@ void jl_finalize_module(std::unique_ptr<Module> m)
         ready_to_emit = m.release();
 }
 
-static int jl_add_to_ee(
-        std::unique_ptr<Module> &M,
-        StringMap<std::unique_ptr<Module>*> &NewExports,
-        DenseMap<Module*, int> &Queued,
-        std::vector<std::vector<std::unique_ptr<Module>*>> &ToMerge,
-        int depth)
+static int jl_add_to_ee(std::unique_ptr<Module> &M,
+                        StringMap<std::unique_ptr<Module> *> &NewExports,
+                        DenseMap<Module *, int> &Queued,
+                        std::vector<std::vector<std::unique_ptr<Module> *>> &ToMerge,
+                        int depth)
 {
     // DAG-sort (post-dominator) the compile to compute the minimum
     // merge-module sets for linkage
@@ -970,10 +979,11 @@ static int jl_add_to_ee(
     return MergeUp;
 }
 
-static void jl_add_to_ee(std::unique_ptr<Module> &M, StringMap<std::unique_ptr<Module>*> &NewExports)
+static void jl_add_to_ee(std::unique_ptr<Module> &M,
+                         StringMap<std::unique_ptr<Module> *> &NewExports)
 {
-    DenseMap<Module*, int> Queued;
-    std::vector<std::vector<std::unique_ptr<Module>*>> ToMerge;
+    DenseMap<Module *, int> Queued;
+    std::vector<std::vector<std::unique_ptr<Module> *>> ToMerge;
     jl_add_to_ee(M, NewExports, Queued, ToMerge, 1);
     assert(!M);
 }

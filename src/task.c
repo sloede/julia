@@ -26,29 +26,31 @@
 
 #include "platform.h"
 
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-#include <errno.h>
-#include <inttypes.h>
 #include "julia.h"
+#include "julia_assert.h"
 #include "julia_internal.h"
 #include "threading.h"
-#include "julia_assert.h"
+#include <errno.h>
+#include <inttypes.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #ifdef JL_ASAN_ENABLED
-static inline void sanitizer_start_switch_fiber(const void* bottom, size_t size) {
+static inline void sanitizer_start_switch_fiber(const void *bottom, size_t size)
+{
     __sanitizer_start_switch_fiber(NULL, bottom, size);
 }
-static inline void sanitizer_finish_switch_fiber(void) {
+static inline void sanitizer_finish_switch_fiber(void)
+{
     __sanitizer_finish_switch_fiber(NULL, NULL, NULL);
 }
 #else
-static inline void sanitizer_start_switch_fiber(const void* bottom, size_t size) {}
+static inline void sanitizer_start_switch_fiber(const void *bottom, size_t size) {}
 static inline void sanitizer_finish_switch_fiber(void) {}
 #endif
 
@@ -82,7 +84,8 @@ jl_sym_t *failed_sym;
 jl_sym_t *runnable_sym;
 
 extern size_t jl_page_size;
-static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner) JL_NOTSAFEPOINT;
+static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize,
+                            jl_task_t *owner) JL_NOTSAFEPOINT;
 STATIC_OR_JS void jl_set_fiber(jl_ucontext_t *t);
 STATIC_OR_JS void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t);
 STATIC_OR_JS void jl_swap_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t);
@@ -92,9 +95,9 @@ static JL_THREAD_LOCAL unw_cursor_t jl_basecursor;
 #endif
 
 #ifdef ALWAYS_COPY_STACKS
-# ifndef COPY_STACKS
-# error "ALWAYS_COPY_STACKS requires COPY_STACKS"
-# endif
+#ifndef COPY_STACKS
+#error "ALWAYS_COPY_STACKS requires COPY_STACKS"
+#endif
 static int always_copy_stacks = 1;
 #else
 static int always_copy_stacks = 0;
@@ -104,21 +107,21 @@ static int always_copy_stacks = 0;
 
 static void memcpy_a16(uint64_t *to, uint64_t *from, size_t nb)
 {
-    memcpy((char*)jl_assume_aligned(to, 16), (char*)jl_assume_aligned(from, 16), nb);
-    //uint64_t *end = (uint64_t*)((char*)from + nb);
-    //while (from < end)
+    memcpy((char *)jl_assume_aligned(to, 16), (char *)jl_assume_aligned(from, 16), nb);
+    // uint64_t *end = (uint64_t*)((char*)from + nb);
+    // while (from < end)
     //    *(to++) = *(from++);
 }
 
 static void NOINLINE save_stack(jl_ptls_t ptls, jl_task_t *lastt, jl_task_t **pt)
 {
-    char *frame_addr = (char*)((uintptr_t)jl_get_frame_addr() & ~15);
-    char *stackbase = (char*)ptls->stackbase;
+    char *frame_addr = (char *)((uintptr_t)jl_get_frame_addr() & ~15);
+    char *stackbase = (char *)ptls->stackbase;
     assert(stackbase > frame_addr);
     size_t nb = stackbase - frame_addr;
     void *buf;
     if (lastt->bufsz < nb) {
-        buf = (void*)jl_gc_alloc_buf(ptls, nb);
+        buf = (void *)jl_gc_alloc_buf(ptls, nb);
         lastt->stkbuf = buf;
         lastt->bufsz = nb;
     }
@@ -128,7 +131,7 @@ static void NOINLINE save_stack(jl_ptls_t ptls, jl_task_t *lastt, jl_task_t **pt
     *pt = NULL; // clear the gc-root for the target task before copying the stack for saving
     lastt->copy_stack = nb;
     lastt->sticky = 1;
-    memcpy_a16((uint64_t*)buf, (uint64_t*)frame_addr, nb);
+    memcpy_a16((uint64_t *)buf, (uint64_t *)frame_addr, nb);
     // this task's stack could have been modified after
     // it was marked by an incremental collection
     // move the barrier back instead of walking it again here
@@ -138,18 +141,21 @@ static void NOINLINE save_stack(jl_ptls_t ptls, jl_task_t *lastt, jl_task_t **pt
 static void NOINLINE JL_NORETURN restore_stack(jl_task_t *t, jl_ptls_t ptls, char *p)
 {
     size_t nb = t->copy_stack;
-    char *_x = (char*)ptls->stackbase - nb;
+    char *_x = (char *)ptls->stackbase - nb;
     if (!p) {
         // switch to a stackframe that's beyond the bounds of the last switch
         p = _x;
-        if ((char*)&_x > _x) {
-            p = (char*)alloca((char*)&_x - _x);
+        if ((char *)&_x > _x) {
+            p = (char *)alloca((char *)&_x - _x);
         }
-        restore_stack(t, ptls, p); // pass p to ensure the compiler can't tailcall this or avoid the alloca
+        restore_stack(
+            t, ptls,
+            p); // pass p to ensure the compiler can't tailcall this or avoid the alloca
     }
     void *_y = t->stkbuf;
     assert(_x != NULL && _y != NULL);
-    memcpy_a16((uint64_t*)_x, (uint64_t*)_y, nb); // destroys all but the current stackframe
+    memcpy_a16((uint64_t *)_x, (uint64_t *)_y,
+               nb); // destroys all but the current stackframe
 
     sanitizer_start_switch_fiber(t->stkbuf, t->bufsz);
     jl_set_fiber(&t->ctx);
@@ -158,10 +164,11 @@ static void NOINLINE JL_NORETURN restore_stack(jl_task_t *t, jl_ptls_t ptls, cha
 static void restore_stack2(jl_task_t *t, jl_ptls_t ptls, jl_task_t *lastt)
 {
     size_t nb = t->copy_stack;
-    char *_x = (char*)ptls->stackbase - nb;
+    char *_x = (char *)ptls->stackbase - nb;
     void *_y = t->stkbuf;
     assert(_x != NULL && _y != NULL);
-    memcpy_a16((uint64_t*)_x, (uint64_t*)_y, nb); // destroys all but the current stackframe
+    memcpy_a16((uint64_t *)_x, (uint64_t *)_y,
+               nb); // destroys all but the current stackframe
     sanitizer_start_switch_fiber(t->stkbuf, t->bufsz);
     jl_swap_fiber(&lastt->ctx, &t->ctx);
     sanitizer_finish_switch_fiber();
@@ -189,11 +196,11 @@ void JL_NORETURN jl_finish_task(jl_task_t *t, jl_value_t *resultval JL_MAYBE_UNR
     jl_get_ptls_states()->world_age = jl_world_counter;
     // let the runtime know this task is dead and find a new task to run
     if (task_done_hook_func == NULL) {
-        task_done_hook_func = (jl_function_t*)jl_get_global(jl_base_module,
-                                                            jl_symbol("task_done_hook"));
+        task_done_hook_func =
+            (jl_function_t *)jl_get_global(jl_base_module, jl_symbol("task_done_hook"));
     }
     if (task_done_hook_func != NULL) {
-        jl_value_t *args[2] = {task_done_hook_func, (jl_value_t*)t};
+        jl_value_t *args[2] = {task_done_hook_func, (jl_value_t *)t};
         JL_TRY {
             jl_apply(args, 2);
         }
@@ -316,7 +323,7 @@ static void ctx_switch(jl_ptls_t ptls)
         }
         else
 #endif
-        *pt = NULL; // can't fail after here: clear the gc-root for the target task now
+            *pt = NULL; // can't fail after here: clear the gc-root for the target task now
         lastt->gcstack = ptls->pgcstack;
     }
 
@@ -345,17 +352,18 @@ static void ctx_switch(jl_ptls_t ptls)
             if (lastt_ctx)
                 restore_stack2(t, ptls, lastt);
             else if (lastt->copy_stack)
-                restore_stack(t, ptls, NULL);     // (doesn't return)
+                restore_stack(t, ptls, NULL); // (doesn't return)
             else
-                restore_stack(t, ptls, (char*)1); // (doesn't return)
+                restore_stack(t, ptls, (char *)1); // (doesn't return)
         }
         else
 #endif
-        if (!lastt_ctx) {
+            if (!lastt_ctx) {
             sanitizer_start_switch_fiber(t->stkbuf, t->bufsz);
             jl_set_fiber(&t->ctx); // (doesn't return)
             abort(); // unreachable
-        } else {
+        }
+        else {
             sanitizer_start_switch_fiber(t->stkbuf, t->bufsz);
             jl_swap_fiber(lastt_ctx, &t->ctx);
             sanitizer_finish_switch_fiber();
@@ -368,7 +376,8 @@ static void ctx_switch(jl_ptls_t ptls)
             jl_longjmp(ptls->base_ctx.uc_mcontext, 1);
             abort(); // unreachable
 #endif
-        } else {
+        }
+        else {
             jl_start_fiber(lastt_ctx, &t->ctx);
             sanitizer_finish_switch_fiber();
         }
@@ -389,7 +398,7 @@ JL_DLLEXPORT void jl_switch(void)
         return;
     }
     if (t->state == done_sym || t->state == failed_sym ||
-            (t->started && t->stkbuf == NULL)) {
+        (t->started && t->stkbuf == NULL)) {
         ct->exception = t->exception;
         ct->result = t->result;
         return;
@@ -477,8 +486,8 @@ void JL_NORETURN throw_internal(jl_value_t *exception JL_MAYBE_UNROOTED)
         // GC. This exists only for the purpose of preserving bt_data until we
         // set ptls->bt_size=0 below.
         assert(ptls->current_task);
-        jl_push_excstack(&ptls->current_task->excstack, exception,
-                          ptls->bt_data, ptls->bt_size);
+        jl_push_excstack(&ptls->current_task->excstack, exception, ptls->bt_data,
+                         ptls->bt_size);
         ptls->bt_size = 0;
     }
     assert(ptls->current_task->excstack && ptls->current_task->excstack->top);
@@ -538,15 +547,16 @@ JL_DLLEXPORT void jl_rethrow_other(jl_value_t *e JL_MAYBE_UNROOTED)
     if (!excstack || excstack->top == 0)
         jl_error("rethrow(exc) not allowed outside a catch block");
     // overwrite exception on top of stack. see jl_excstack_exception
-    jl_excstack_raw(excstack)[excstack->top-1].jlvalue = e;
+    jl_excstack_raw(excstack)[excstack->top - 1].jlvalue = e;
     JL_GC_PROMISE_ROOTED(e);
     throw_internal(NULL);
 }
 
-JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion_future, size_t ssize)
+JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion_future,
+                                    size_t ssize)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_task_t *t = (jl_task_t*)jl_gc_alloc(ptls, sizeof(jl_task_t), jl_task_type);
+    jl_task_t *t = (jl_task_t *)jl_gc_alloc(ptls, sizeof(jl_task_t), jl_task_type);
     t->copy_stack = 0;
     if (ssize == 0) {
         // stack size unspecified; use default
@@ -606,7 +616,7 @@ JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, jl_value_t *completion
 JL_DLLEXPORT jl_value_t *jl_get_current_task(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    return (jl_value_t*)ptls->current_task;
+    return (jl_value_t *)ptls->current_task;
 }
 
 #ifdef JL_HAVE_ASYNCIFY
@@ -618,14 +628,14 @@ JL_DLLEXPORT jl_ucontext_t *task_ctx_ptr(jl_task_t *t)
 JL_DLLEXPORT jl_value_t *jl_get_root_task(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    return (jl_value_t*)ptls->root_task;
+    return (jl_value_t *)ptls->root_task;
 }
 
 void JL_DLLEXPORT jl_task_wait()
 {
     static jl_function_t *wait_func = NULL;
     if (!wait_func) {
-        wait_func = (jl_function_t*)jl_get_global(jl_base_module, jl_symbol("wait"));
+        wait_func = (jl_function_t *)jl_get_global(jl_base_module, jl_symbol("wait"));
     }
     size_t last_age = jl_get_ptls_states()->world_age;
     jl_get_ptls_states()->world_age = jl_get_world_counter();
@@ -637,11 +647,11 @@ void JL_DLLEXPORT jl_schedule_task(jl_task_t *task)
 {
     static jl_function_t *sched_func = NULL;
     if (!sched_func) {
-        sched_func = (jl_function_t*)jl_get_global(jl_base_module, jl_symbol("schedule"));
+        sched_func = (jl_function_t *)jl_get_global(jl_base_module, jl_symbol("schedule"));
     }
     size_t last_age = jl_get_ptls_states()->world_age;
     jl_get_ptls_states()->world_age = jl_get_world_counter();
-    jl_value_t *args[] = {(jl_value_t*)sched_func, (jl_value_t*)task};
+    jl_value_t *args[] = {(jl_value_t *)sched_func, (jl_value_t *)task};
     jl_apply(args, 2);
     jl_get_ptls_states()->world_age = last_age;
 }
@@ -673,7 +683,7 @@ STATIC_OR_JS void NOINLINE JL_NORETURN start_task(void)
 #if defined(_CPU_X86_64_)
     // install the unhandled exception hanlder at the top of our stack
     // to call directly into our personality handler
-    asm volatile ("\t.seh_handler __julia_personality, @except\n\t.text");
+    asm volatile("\t.seh_handler __julia_personality, @except\n\t.text");
 #endif
 #endif
 
@@ -692,8 +702,7 @@ STATIC_OR_JS void NOINLINE JL_NORETURN start_task(void)
     t->started = 1;
     if (t->exception != jl_nothing) {
         record_backtrace(ptls, 0);
-        jl_push_excstack(&t->excstack, t->exception,
-                         ptls->bt_data, ptls->bt_size);
+        jl_push_excstack(&t->excstack, t->exception, ptls->bt_data, ptls->bt_size);
         res = t->exception;
     }
     else {
@@ -727,7 +736,8 @@ skip_pop_exception:;
 #define swapcontext jl_swapcontext
 #define makecontext jl_makecontext
 #endif
-static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner) JL_NOTSAFEPOINT
+static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize,
+                            jl_task_t *owner) JL_NOTSAFEPOINT
 {
 #ifndef _OS_WINDOWS_
     int r = getcontext(t);
@@ -745,7 +755,7 @@ static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner) J
     t->uc_link = NULL;
     makecontext(t, &start_task, 0);
 #endif
-    return (char*)stk;
+    return (char *)stk;
 }
 static void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t)
 {
@@ -782,27 +792,26 @@ static void start_basefiber(void)
     abort(); // unreachable
 }
 #if defined(_CPU_X86_) || defined(_CPU_X86_64_)
-#define PUSH_RET(ctx, stk) \
-    do { \
-        stk -= sizeof(uintptr_t); \
-        *(uintptr_t*)stk = 0; /* push null RIP/EIP onto the stack */ \
+#define PUSH_RET(ctx, stk)                                            \
+    do {                                                              \
+        stk -= sizeof(uintptr_t);                                     \
+        *(uintptr_t *)stk = 0; /* push null RIP/EIP onto the stack */ \
     } while (0)
 #elif defined(_CPU_ARM_)
-#define PUSH_RET(ctx, stk) \
-    unw_set_reg(ctx, UNW_ARM_R14, 0) /* put NULL into the LR */
+#define PUSH_RET(ctx, stk) unw_set_reg(ctx, UNW_ARM_R14, 0) /* put NULL into the LR */
 #else
 #error please define how to simulate a CALL on this platform
 #endif
 static char *jl_alloc_fiber(unw_context_t *t, size_t *ssize, jl_task_t *owner)
 {
-    char *stkbuf = (char*)jl_malloc_stack(ssize, owner);
+    char *stkbuf = (char *)jl_malloc_stack(ssize, owner);
     if (stkbuf == NULL)
         return NULL;
     char *stk = stkbuf;
     stk += *ssize;
     PUSH_RET(&jl_basecursor, stk);
     if (unw_set_reg(&jl_basecursor, UNW_REG_SP, (uintptr_t)stk) != 0) {
-        jl_free_stack((void*)stkbuf, *ssize);
+        jl_free_stack((void *)stkbuf, *ssize);
         jl_error("unw_set_reg UNW_REG_SP failed");
     }
     uintptr_t fn;
@@ -811,7 +820,7 @@ static char *jl_alloc_fiber(unw_context_t *t, size_t *ssize, jl_task_t *owner)
     else
         fn = (uintptr_t)&start_task;
     if (unw_set_reg(&jl_basecursor, UNW_REG_IP, fn) != 0) {
-        jl_free_stack((void*)stkbuf, *ssize);
+        jl_free_stack((void *)stkbuf, *ssize);
         jl_error("unw_set_reg UNW_REG_IP failed");
     }
     return stkbuf;
@@ -855,12 +864,12 @@ static void jl_init_basefiber(size_t ssize)
 #if defined(JL_HAVE_ASM)
 static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner)
 {
-    char *stkbuf = (char*)jl_malloc_stack(ssize, owner);
+    char *stkbuf = (char *)jl_malloc_stack(ssize, owner);
     if (stkbuf == NULL)
         return NULL;
 #ifndef __clang_analyzer__
-    ((char**)t)[0] = stkbuf; // stash the stack pointer somewhere for start_fiber
-    ((size_t*)t)[1] = *ssize; // stash the stack size somewhere for start_fiber
+    ((char **)t)[0] = stkbuf; // stash the stack pointer somewhere for start_fiber
+    ((size_t *)t)[1] = *ssize; // stash the stack size somewhere for start_fiber
 #endif
     return stkbuf;
 }
@@ -868,36 +877,39 @@ static void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t)
 {
     if (lastt && jl_setjmp(lastt->uc_mcontext, 0))
         return;
-    char *stk = ((char**)t)[0];
-    size_t ssize = ((size_t*)t)[1];
+    char *stk = ((char **)t)[0];
+    size_t ssize = ((size_t *)t)[1];
     uintptr_t fn = (uintptr_t)&start_task;
     stk += ssize;
 #ifdef _CPU_X86_64_
-    asm volatile (
-        " movq %0, %%rsp;\n"
-        " movq %1, %%rax;\n"
-        " xorq %%rbp, %%rbp;\n"
-        " push %%rbp;\n" // instead of RSP
-        " jmpq *%%rax;\n" // call `fn` with fake stack frame
-        " ud2"
-        : : "r"(stk), "r"(fn) : "memory" );
+    asm volatile(" movq %0, %%rsp;\n"
+                 " movq %1, %%rax;\n"
+                 " xorq %%rbp, %%rbp;\n"
+                 " push %%rbp;\n" // instead of RSP
+                 " jmpq *%%rax;\n" // call `fn` with fake stack frame
+                 " ud2"
+                 :
+                 : "r"(stk), "r"(fn)
+                 : "memory");
 #elif defined(_CPU_X86_)
-    asm volatile (
-        " movl %0, %%esp;\n"
-        " movl %1, %%eax;\n"
-        " xorl %%ebp, %%ebp;\n"
-        " push %%ebp;\n" // instead of ESP
-        " jmpl *%%eax;\n" // call `fn` with fake stack frame
-        " ud2"
-        : : "r"(stk), "r"(fn) : "memory" );
+    asm volatile(" movl %0, %%esp;\n"
+                 " movl %1, %%eax;\n"
+                 " xorl %%ebp, %%ebp;\n"
+                 " push %%ebp;\n" // instead of ESP
+                 " jmpl *%%eax;\n" // call `fn` with fake stack frame
+                 " ud2"
+                 :
+                 : "r"(stk), "r"(fn)
+                 : "memory");
 #elif defined(_CPU_AARCH64_)
-    asm volatile(
-        " mov sp, %0;\n"
-        " mov x29, xzr;\n" // Clear link register (x29) and frame pointer
-        " mov x30, xzr;\n" // (x30) to terminate unwinder.
-        " br %1;\n" // call `fn` with fake stack frame
-        " brk #0x1" // abort
-        : : "r" (stk), "r"(fn) : "memory" );
+    asm volatile(" mov sp, %0;\n"
+                 " mov x29, xzr;\n" // Clear link register (x29) and frame pointer
+                 " mov x30, xzr;\n" // (x30) to terminate unwinder.
+                 " br %1;\n" // call `fn` with fake stack frame
+                 " brk #0x1" // abort
+                 :
+                 : "r"(stk), "r"(fn)
+                 : "memory");
 #elif defined(_CPU_ARM_)
     // A "i" constraint on `&start_task` works only on clang and not on GCC.
     asm(" mov sp, %0;\n"
@@ -907,7 +919,9 @@ static void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t)
                     // the processor mode to thumb, this will never happen
                     // because all our addresses are word-aligned.
         " udf #0" // abort
-        : : "r" (stk), "r"(fn) : "memory" );
+        :
+        : "r"(stk), "r"(fn)
+        : "memory");
 #elif defined(_CPU_PPC64_)
     // N.B.: There is two iterations of the PPC64 ABI.
     // v2 is current and used here. Make sure you have the
@@ -925,12 +939,14 @@ static void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t)
         " std 0, 0x10(1);\n"
         " std 0, 0x8(1);\n"
         " std 0, 0x0(1); \n" // Clear back link to terminate unwinder
-        " mtlr 0; \n"        // Clear link register
-        " mr 12, %1; \n"     // Set up target global entry point
-        " mtctr 12; \n"      // Move jump target to counter register
-        " bctr; \n"          // branch to counter (lr update disabled)
+        " mtlr 0; \n" // Clear link register
+        " mr 12, %1; \n" // Set up target global entry point
+        " mtctr 12; \n" // Move jump target to counter register
+        " bctr; \n" // branch to counter (lr update disabled)
         " trap; \n"
-        : : "r"(stk), "r"(fn) : "memory");
+        :
+        : "r"(stk), "r"(fn)
+        : "memory");
 #else
 #error JL_HAVE_ASM defined but not implemented for this CPU type
 #endif
@@ -977,23 +993,23 @@ static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner)
     memcpy(&base_ctx, &ptls->base_ctx, sizeof(ptls->base_ctx));
     sigfillset(&set);
     if (sigprocmask(SIG_BLOCK, &set, &oset) != 0) {
-       jl_free_stack(stk, *ssize);
-       jl_error("sigprocmask failed");
+        jl_free_stack(stk, *ssize);
+        jl_error("sigprocmask failed");
     }
     uc_stack.ss_sp = stk;
     uc_stack.ss_size = *ssize;
     uc_stack.ss_flags = 0;
     if (sigaltstack(&uc_stack, &osigstk) != 0) {
-       jl_free_stack(stk, *ssize);
-       jl_error("sigaltstack failed");
+        jl_free_stack(stk, *ssize);
+        jl_error("sigaltstack failed");
     }
     memset(&sa, 0, sizeof(sa));
     sigemptyset(&sa.sa_mask);
     sa.sa_handler = start_basefiber;
     sa.sa_flags = SA_ONSTACK;
     if (sigaction(SIGUSR2, &sa, &osa) != 0) {
-       jl_free_stack(stk, *ssize);
-       jl_error("sigaction failed");
+        jl_free_stack(stk, *ssize);
+        jl_error("sigaction failed");
     }
     // emit signal
     pthread_kill(pthread_self(), SIGUSR2); // initializes jl_basectx
@@ -1001,22 +1017,22 @@ static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner)
     sigsuspend(&set);
     // cleanup
     if (sigaction(SIGUSR2, &osa, NULL) != 0) {
-       jl_free_stack(stk, *ssize);
-       jl_error("sigaction failed");
+        jl_free_stack(stk, *ssize);
+        jl_error("sigaction failed");
     }
     if (osigstk.ss_size < MINSTKSZ && (osigstk.ss_flags | SS_DISABLE))
-       osigstk.ss_size = MINSTKSZ;
+        osigstk.ss_size = MINSTKSZ;
     if (sigaltstack(&osigstk, NULL) != 0) {
-       jl_free_stack(stk, *ssize);
-       jl_error("sigaltstack failed");
+        jl_free_stack(stk, *ssize);
+        jl_error("sigaltstack failed");
     }
     if (sigprocmask(SIG_SETMASK, &oset, NULL) != 0) {
-       jl_free_stack(stk, *ssize);
-       jl_error("sigprocmask failed");
+        jl_free_stack(stk, *ssize);
+        jl_error("sigprocmask failed");
     }
     memcpy(&t, &ptls->base_ctx, sizeof(ptls->base_ctx));
     memcpy(&ptls->base_ctx, &base_ctx, sizeof(ptls->base_ctx));
-    return (char*)stk;
+    return (char *)stk;
 }
 static void jl_start_fiber(jl_ucontext_t *lastt, jl_ucontext_t *t)
 {
@@ -1047,17 +1063,16 @@ static void jl_init_basefiber(size_t ssize)
 #endif
 
 #if defined(JL_HAVE_ASYNCIFY)
-static void jl_init_basefiber(size_t ssize)
-{
-}
-static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize, jl_task_t *owner) JL_NOTSAFEPOINT
+static void jl_init_basefiber(size_t ssize) {}
+static char *jl_alloc_fiber(jl_ucontext_t *t, size_t *ssize,
+                            jl_task_t *owner) JL_NOTSAFEPOINT
 {
     void *stk = jl_malloc_stack(ssize, owner);
     if (stk == NULL)
         return NULL;
     t->stackbottom = stk;
-    t->stacktop = ((char*)stk) + *ssize;
-    return (char*)stk;
+    t->stacktop = ((char *)stk) + *ssize;
+    return (char *)stk;
 }
 // jl_*_fiber implemented in js
 #endif
@@ -1067,17 +1082,21 @@ void jl_init_root_task(void *stack_lo, void *stack_hi)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     if (ptls->root_task == NULL) {
-        ptls->root_task = (jl_task_t*)jl_gc_alloc(ptls, sizeof(jl_task_t), jl_task_type);
+        ptls->root_task = (jl_task_t *)jl_gc_alloc(ptls, sizeof(jl_task_t), jl_task_type);
         memset(ptls->root_task, 0, sizeof(jl_task_t));
         ptls->root_task->tls = jl_nothing;
     }
     ptls->current_task = ptls->root_task;
     void *stack = stack_lo;
-    size_t ssize = (char*)stack_hi - (char*)stack_lo;
+    size_t ssize = (char *)stack_hi - (char *)stack_lo;
 #ifndef _OS_WINDOWS_
     if (ptls->tid == 0) {
-        stack = (void*)((char*)stack - ROOT_TASK_STACK_ADJUSTMENT); // offset our guess of the address of the bottom of stack to cover the guard pages too
-        ssize += ROOT_TASK_STACK_ADJUSTMENT; // sizeof stack is known exactly, but not where we are in that stack
+        stack = (void *)((char *)stack -
+                         ROOT_TASK_STACK_ADJUSTMENT); // offset our guess of the address of
+                                                      // the bottom of stack to cover the
+                                                      // guard pages too
+        ssize += ROOT_TASK_STACK_ADJUSTMENT; // sizeof stack is known exactly, but not where
+                                             // we are in that stack
     }
 #endif
     if (always_copy_stacks) {
@@ -1143,17 +1162,15 @@ JL_DLLEXPORT void jl_gdb_dump_threadinfo(void)
     DWORD64 gs8 = __readgsqword(0x8);
     DWORD64 gs16 = __readgsqword(0x10);
     jl_safe_printf("ThreadId: %u, Stack: %p -- %p to %p, SEH: %p\n",
-                   (unsigned)GetCurrentThreadId(),
-                   jl_get_frame_addr(),
-                   (void*)gs8, (void*)gs16, (void*)gs0);
+                   (unsigned)GetCurrentThreadId(), jl_get_frame_addr(), (void *)gs8,
+                   (void *)gs16, (void *)gs0);
 #elif defined(_CPU_X86_)
     DWORD32 fs0 = __readfsdword(0x0);
     DWORD32 fs4 = __readfsdword(0x4);
     DWORD32 fs8 = __readfsdword(0x8);
     jl_safe_printf("ThreadId: %u, Stack: %p -- %p to %p, SEH: %p\n",
-                   (unsigned)GetCurrentThreadId(),
-                   jl_get_frame_addr(),
-                   (void*)fs4, (void*)fs8, (void*)fs0);
+                   (unsigned)GetCurrentThreadId(), jl_get_frame_addr(), (void *)fs4,
+                   (void *)fs8, (void *)fs0);
     if (__readgs()) { // WoW64 if GS is non-zero
         DWORD32 gs0 = __readgsdword(0x0);
         DWORD32 gs4 = __readgsdword(0x4);
@@ -1161,14 +1178,11 @@ JL_DLLEXPORT void jl_gdb_dump_threadinfo(void)
         DWORD32 gs12 = __readgsdword(0xc);
         DWORD32 gs16 = __readgsdword(0x10);
         DWORD32 gs20 = __readgsdword(0x14);
-        jl_safe_printf("Stack64: %p%p to %p%p, SEH64: %p%p\n",
-                       (void*)gs12, (void*)gs8,
-                       (void*)gs20, (void*)gs16,
-                       (void*)gs4, (void*)gs0);
+        jl_safe_printf("Stack64: %p%p to %p%p, SEH64: %p%p\n", (void *)gs12, (void *)gs8,
+                       (void *)gs20, (void *)gs16, (void *)gs4, (void *)gs0);
     }
 #else
-    jl_safe_printf("ThreadId: %u, Stack: %p\n",
-                   (unsigned)GetCurrentThreadId(),
+    jl_safe_printf("ThreadId: %u, Stack: %p\n", (unsigned)GetCurrentThreadId(),
                    jl_get_frame_addr());
 #endif
 }

@@ -1,7 +1,8 @@
 // This file is a part of Julia. License is MIT: https://julialang.org/license
 
 #ifdef _CPU_X86_
-// avx is unusable on 32bit before LLVM 5.0 due to LLVM bug (try to encode too many registers)
+// avx is unusable on 32bit before LLVM 5.0 due to LLVM bug (try to encode too many
+// registers)
 #define JL_X86_AVX_MIN_VER 50000
 #define JL_X86_64ONLY_VER(x) UINT32_MAX
 #else

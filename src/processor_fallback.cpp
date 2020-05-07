@@ -12,9 +12,7 @@ static inline const std::string &host_cpu_name()
 
 static const std::vector<TargetData<1>> &get_cmdline_targets(void)
 {
-    auto feature_cb = [] (const char*, size_t, FeatureList<1>&) {
-        return false;
-    };
+    auto feature_cb = [](const char *, size_t, FeatureList<1> &) { return false; };
     return ::get_cmdline_targets<1>(feature_cb);
 }
 
@@ -40,7 +38,7 @@ static uint32_t sysimg_init_cb(const void *id)
     TargetData<1> target = arg_target_data(cmdline[0], true);
     // Find the last name match or use the default one.
     uint32_t best_idx = 0;
-    auto sysimg = deserialize_target_data<1>((const uint8_t*)id);
+    auto sysimg = deserialize_target_data<1>((const uint8_t *)id);
     for (uint32_t i = 0; i < sysimg.size(); i++) {
         auto &imgt = sysimg[i];
         if (imgt.name == target.name) {
@@ -58,7 +56,7 @@ static void ensure_jit_target(bool imaging)
     check_cmdline(cmdline, imaging);
     if (!jit_targets.empty())
         return;
-    for (auto &arg: cmdline) {
+    for (auto &arg : cmdline) {
         auto data = arg_target_data(arg, jit_targets.empty());
         jit_targets.push_back(std::move(data));
     }
@@ -70,13 +68,13 @@ static void ensure_jit_target(bool imaging)
     }
 }
 
-static std::pair<std::string,std::vector<std::string>>
+static std::pair<std::string, std::vector<std::string>>
 get_llvm_target_noext(const TargetData<1> &data)
 {
     return std::make_pair(data.name, std::vector<std::string>{});
 }
 
-static std::pair<std::string,std::vector<std::string>>
+static std::pair<std::string, std::vector<std::string>>
 get_llvm_target_vec(const TargetData<1> &data)
 {
     auto res0 = get_llvm_target_noext(data);
@@ -84,8 +82,7 @@ get_llvm_target_vec(const TargetData<1> &data)
     return res0;
 }
 
-static std::pair<std::string,std::string>
-get_llvm_target_str(const TargetData<1> &data)
+static std::pair<std::string, std::string> get_llvm_target_str(const TargetData<1> &data)
 {
     auto res0 = get_llvm_target_noext(data);
     auto features = join_feature_strs(res0.second);
@@ -104,17 +101,18 @@ jl_sysimg_fptrs_t jl_init_processor_sysimg(void *hdl)
     return parse_sysimg(hdl, sysimg_init_cb);
 }
 
-std::pair<std::string,std::vector<std::string>> jl_get_llvm_target(bool imaging, uint32_t &flags)
+std::pair<std::string, std::vector<std::string>> jl_get_llvm_target(bool imaging,
+                                                                    uint32_t &flags)
 {
     ensure_jit_target(imaging);
     flags = jit_targets[0].en.flags;
     return get_llvm_target_vec(jit_targets[0]);
 }
 
-const std::pair<std::string,std::string> &jl_get_llvm_disasm_target(void)
+const std::pair<std::string, std::string> &jl_get_llvm_disasm_target(void)
 {
-    static const auto res = get_llvm_target_str(TargetData<1>{host_cpu_name(),
-                jl_get_cpu_features_llvm(), {{}, 0}, {{}, 0}, 0});
+    static const auto res = get_llvm_target_str(
+        TargetData<1>{host_cpu_name(), jl_get_cpu_features_llvm(), {{}, 0}, {{}, 0}, 0});
     return res;
 }
 
@@ -123,7 +121,7 @@ std::vector<jl_target_spec_t> jl_get_llvm_clone_targets(void)
     if (jit_targets.empty())
         jl_error("JIT targets not initialized");
     std::vector<jl_target_spec_t> res;
-    for (auto &target: jit_targets) {
+    for (auto &target : jit_targets) {
         jl_target_spec_t ele;
         std::tie(ele.cpu_name, ele.cpu_features) = get_llvm_target_str(target);
         ele.data = serialize_target_data(target.name, target.en.features,

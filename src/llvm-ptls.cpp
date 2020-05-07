@@ -12,38 +12,35 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
-#include <llvm/Pass.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
-#include <llvm/IR/Constants.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/MDBuilder.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Pass.h>
 
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
-#include "julia.h"
-#include "julia_internal.h"
 #include "codegen_shared.h"
+#include "julia.h"
 #include "julia_assert.h"
+#include "julia_internal.h"
 
 using namespace llvm;
 
 typedef Instruction TerminatorInst;
 
-std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr,
-                                           bool isConstant=false);
+std::pair<MDNode *, MDNode *> tbaa_make_child(const char *name, MDNode *parent = nullptr,
+                                              bool isConstant = false);
 
 namespace {
 
-struct LowerPTLS: public ModulePass {
+struct LowerPTLS : public ModulePass {
     static char ID;
-    LowerPTLS(bool imaging_mode=false)
-        : ModulePass(ID),
-          imaging_mode(imaging_mode)
-    {}
+    LowerPTLS(bool imaging_mode = false) : ModulePass(ID), imaging_mode(imaging_mode) {}
 
 private:
     const bool imaging_mode;
@@ -61,7 +58,8 @@ private:
     GlobalVariable *ptls_offset{nullptr};
     void set_ptls_attrs(CallInst *ptlsStates) const;
     Instruction *emit_ptls_tp(Value *offset, Instruction *insertBefore) const;
-    template<typename T> T *add_comdat(T *G) const;
+    template<typename T>
+    T *add_comdat(T *G) const;
     GlobalVariable *create_aliased_global(Type *T, StringRef name) const;
     void fix_ptls_use(CallInst *ptlsStates);
     bool runOnModule(Module &M) override;
@@ -80,34 +78,34 @@ Instruction *LowerPTLS::emit_ptls_tp(Value *offset, Instruction *insertBefore) c
         // Workaround LLVM bug by hiding the offset computation
         // (and therefore the optimization opportunity) from LLVM.
         // Ref https://github.com/JuliaLang/julia/issues/17288
-        static const std::string const_asm_str = [&] () {
+        static const std::string const_asm_str = [&]() {
             std::stringstream stm;
-#  if defined(_CPU_X86_64_)
+#if defined(_CPU_X86_64_)
             stm << "movq %fs:0, $0;\naddq $$" << jl_tls_offset << ", $0";
-#  else
+#else
             stm << "movl %gs:0, $0;\naddl $$" << jl_tls_offset << ", $0";
-#  endif
+#endif
             return stm.str();
         }();
-#  if defined(_CPU_X86_64_)
+#if defined(_CPU_X86_64_)
         const char *dyn_asm_str = "movq %fs:0, $0;\naddq $1, $0";
-#  else
+#else
         const char *dyn_asm_str = "movl %gs:0, $0;\naddl $1, $0";
-#  endif
+#endif
 
         // The add instruction clobbers flags
         Value *tls;
         if (offset) {
-            std::vector<Type*> args(0);
+            std::vector<Type *> args(0);
             args.push_back(offset->getType());
-            auto tp = InlineAsm::get(FunctionType::get(T_pint8, args, false),
-                                     dyn_asm_str, "=&r,r,~{dirflag},~{fpsr},~{flags}", false);
+            auto tp = InlineAsm::get(FunctionType::get(T_pint8, args, false), dyn_asm_str,
+                                     "=&r,r,~{dirflag},~{fpsr},~{flags}", false);
             tls = CallInst::Create(tp, offset, "ptls_i8", insertBefore);
         }
         else {
-            auto tp = InlineAsm::get(FunctionType::get(T_pint8, false),
-                                     const_asm_str.c_str(), "=r,~{dirflag},~{fpsr},~{flags}",
-                                     false);
+            auto tp =
+                InlineAsm::get(FunctionType::get(T_pint8, false), const_asm_str.c_str(),
+                               "=r,~{dirflag},~{fpsr},~{flags}", false);
             tls = CallInst::Create(tp, "ptls_i8", insertBefore);
         }
         return new BitCastInst(tls, T_pppjlvalue, "ptls", insertBefore);
@@ -147,8 +145,7 @@ GlobalVariable *LowerPTLS::create_aliased_global(Type *T, StringRef name) const
     // (can be accessed with a single PC-rel load).
     auto GV = new GlobalVariable(*M, T, false, GlobalVariable::InternalLinkage,
                                  Constant::getNullValue(T), name + ".real");
-    add_comdat(GlobalAlias::create(T, 0, GlobalVariable::ExternalLinkage,
-                                   name, GV, M));
+    add_comdat(GlobalAlias::create(T, 0, GlobalVariable::ExternalLinkage, name, GV, M));
     return GV;
 }
 
@@ -189,7 +186,8 @@ void LowerPTLS::fix_ptls_use(CallInst *ptlsStates)
             //     ptls = getter();
             auto offset = new LoadInst(T_size, ptls_offset, "", false, ptlsStates);
             offset->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_const);
-            offset->setMetadata(llvm::LLVMContext::MD_invariant_load, MDNode::get(*ctx, None));
+            offset->setMetadata(llvm::LLVMContext::MD_invariant_load,
+                                MDNode::get(*ctx, None));
             auto cmp = new ICmpInst(ptlsStates, CmpInst::ICMP_NE, offset,
                                     Constant::getNullValue(offset->getType()));
             MDBuilder MDB(*ctx);
@@ -205,7 +203,8 @@ void LowerPTLS::fix_ptls_use(CallInst *ptlsStates)
             ptlsStates->moveBefore(slowTerm);
             auto getter = new LoadInst(T_ptls_getter, ptls_slot, "", false, ptlsStates);
             getter->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_const);
-            getter->setMetadata(llvm::LLVMContext::MD_invariant_load, MDNode::get(*ctx, None));
+            getter->setMetadata(llvm::LLVMContext::MD_invariant_load,
+                                MDNode::get(*ctx, None));
             ptlsStates->setCalledFunction(ptlsStates->getFunctionType(), getter);
             set_ptls_attrs(ptlsStates);
 
@@ -231,7 +230,8 @@ void LowerPTLS::fix_ptls_use(CallInst *ptlsStates)
     else {
         // use the address of the actual getter function directly
         auto val = ConstantInt::get(T_size, (uintptr_t)jl_get_ptls_states_getter());
-        ptlsStates->setCalledFunction(ptlsStates->getFunctionType(), ConstantExpr::getIntToPtr(val, T_ptls_getter));
+        ptlsStates->setCalledFunction(ptlsStates->getFunctionType(),
+                                      ConstantExpr::getIntToPtr(val, T_ptls_getter));
         set_ptls_attrs(ptlsStates);
     }
 }
@@ -272,8 +272,7 @@ bool LowerPTLS::runOnModule(Module &_M)
 char LowerPTLS::ID = 0;
 
 static RegisterPass<LowerPTLS> X("LowerPTLS", "LowerPTLS Pass",
-                                 false /* Only looks at CFG */,
-                                 false /* Analysis Pass */);
+                                 false /* Only looks at CFG */, false /* Analysis Pass */);
 
 } // anonymous namespace
 
@@ -282,7 +281,8 @@ Pass *createLowerPTLSPass(bool imaging_mode)
     return new LowerPTLS(imaging_mode);
 }
 
-extern "C" JL_DLLEXPORT void LLVMExtraAddLowerPTLSPass(LLVMPassManagerRef PM, LLVMBool imaging_mode)
+extern "C" JL_DLLEXPORT void LLVMExtraAddLowerPTLSPass(LLVMPassManagerRef PM,
+                                                       LLVMBool imaging_mode)
 {
     unwrap(PM)->add(createLowerPTLSPass(imaging_mode));
 }

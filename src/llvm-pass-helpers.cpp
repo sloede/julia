@@ -20,16 +20,29 @@
 
 using namespace llvm;
 
-extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr, bool isConstant=false);
+extern std::pair<MDNode *, MDNode *>
+tbaa_make_child(const char *name, MDNode *parent = nullptr, bool isConstant = false);
 
 JuliaPassContext::JuliaPassContext()
-    : T_size(nullptr), T_int8(nullptr), T_int32(nullptr),
-        T_pint8(nullptr), T_jlvalue(nullptr), T_prjlvalue(nullptr),
-        T_ppjlvalue(nullptr), T_pjlvalue(nullptr), T_pjlvalue_der(nullptr),
-        T_ppjlvalue_der(nullptr), ptls_getter(nullptr), gc_flush_func(nullptr),
-        gc_preserve_begin_func(nullptr), gc_preserve_end_func(nullptr),
-        pointer_from_objref_func(nullptr), alloc_obj_func(nullptr),
-        typeof_func(nullptr), write_barrier_func(nullptr), module(nullptr)
+  : T_size(nullptr),
+    T_int8(nullptr),
+    T_int32(nullptr),
+    T_pint8(nullptr),
+    T_jlvalue(nullptr),
+    T_prjlvalue(nullptr),
+    T_ppjlvalue(nullptr),
+    T_pjlvalue(nullptr),
+    T_pjlvalue_der(nullptr),
+    T_ppjlvalue_der(nullptr),
+    ptls_getter(nullptr),
+    gc_flush_func(nullptr),
+    gc_preserve_begin_func(nullptr),
+    gc_preserve_end_func(nullptr),
+    pointer_from_objref_func(nullptr),
+    alloc_obj_func(nullptr),
+    typeof_func(nullptr),
+    write_barrier_func(nullptr),
+    module(nullptr)
 {
     tbaa_gcframe = tbaa_make_child("jtbaa_gcframe").first;
     MDNode *tbaa_data;
@@ -102,14 +115,14 @@ llvm::CallInst *JuliaPassContext::getPtls(llvm::Function &F) const
     return nullptr;
 }
 
-llvm::Function *JuliaPassContext::getOrNull(
-    const jl_intrinsics::IntrinsicDescription &desc) const
+llvm::Function *
+JuliaPassContext::getOrNull(const jl_intrinsics::IntrinsicDescription &desc) const
 {
     return module->getFunction(desc.name);
 }
 
-llvm::Function *JuliaPassContext::getOrDeclare(
-    const jl_intrinsics::IntrinsicDescription &desc)
+llvm::Function *
+JuliaPassContext::getOrDeclare(const jl_intrinsics::IntrinsicDescription &desc)
 {
     auto local = getOrNull(desc);
     if (local) {
@@ -129,148 +142,118 @@ llvm::Function *JuliaPassContext::getOrDeclare(
 }
 
 namespace jl_intrinsics {
-    static const char *GET_GC_FRAME_SLOT_NAME = "julia.get_gc_frame_slot";
-    static const char *GC_ALLOC_BYTES_NAME = "julia.gc_alloc_bytes";
-    static const char *NEW_GC_FRAME_NAME = "julia.new_gc_frame";
-    static const char *PUSH_GC_FRAME_NAME = "julia.push_gc_frame";
-    static const char *POP_GC_FRAME_NAME = "julia.pop_gc_frame";
-    static const char *QUEUE_GC_ROOT_NAME = "julia.queue_gc_root";
+static const char *GET_GC_FRAME_SLOT_NAME = "julia.get_gc_frame_slot";
+static const char *GC_ALLOC_BYTES_NAME = "julia.gc_alloc_bytes";
+static const char *NEW_GC_FRAME_NAME = "julia.new_gc_frame";
+static const char *PUSH_GC_FRAME_NAME = "julia.push_gc_frame";
+static const char *POP_GC_FRAME_NAME = "julia.pop_gc_frame";
+static const char *QUEUE_GC_ROOT_NAME = "julia.queue_gc_root";
 
-    // Annotates a function with attributes suitable for GC allocation
-    // functions. Specifically, the return value is marked noalias and nonnull.
-    // The allocation size is set to the first argument.
-    static Function *addGCAllocAttributes(Function *target, LLVMContext &context)
-    {
-        target->addAttribute(AttributeList::ReturnIndex, Attribute::NoAlias);
-        target->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
-        target->addFnAttr(Attribute::getWithAllocSizeArgs(context, 1, None)); // returns %1 bytes
-        return target;
-    }
+// Annotates a function with attributes suitable for GC allocation
+// functions. Specifically, the return value is marked noalias and nonnull.
+// The allocation size is set to the first argument.
+static Function *addGCAllocAttributes(Function *target, LLVMContext &context)
+{
+    target->addAttribute(AttributeList::ReturnIndex, Attribute::NoAlias);
+    target->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
+    target->addFnAttr(
+        Attribute::getWithAllocSizeArgs(context, 1, None)); // returns %1 bytes
+    return target;
+}
 
-    const IntrinsicDescription getGCFrameSlot(
-        GET_GC_FRAME_SLOT_NAME,
-        [](const JuliaPassContext &context) {
-            return Function::Create(
-                FunctionType::get(
-                    PointerType::get(context.T_prjlvalue, 0),
-                    {PointerType::get(context.T_prjlvalue, 0), context.T_int32},
-                    false),
-                Function::ExternalLinkage,
-                GET_GC_FRAME_SLOT_NAME);
-        });
+const IntrinsicDescription
+    getGCFrameSlot(GET_GC_FRAME_SLOT_NAME, [](const JuliaPassContext &context) {
+        return Function::Create(
+            FunctionType::get(PointerType::get(context.T_prjlvalue, 0),
+                              {PointerType::get(context.T_prjlvalue, 0), context.T_int32},
+                              false),
+            Function::ExternalLinkage, GET_GC_FRAME_SLOT_NAME);
+    });
 
-    const IntrinsicDescription GCAllocBytes(
-        GC_ALLOC_BYTES_NAME,
-        [](const JuliaPassContext &context) {
-            auto intrinsic = Function::Create(
-                FunctionType::get(
-                    context.T_prjlvalue,
-                    { context.T_pint8, context.T_size },
-                    false),
-                Function::ExternalLinkage,
-                GC_ALLOC_BYTES_NAME);
+const IntrinsicDescription
+    GCAllocBytes(GC_ALLOC_BYTES_NAME, [](const JuliaPassContext &context) {
+        auto intrinsic =
+            Function::Create(FunctionType::get(context.T_prjlvalue,
+                                               {context.T_pint8, context.T_size}, false),
+                             Function::ExternalLinkage, GC_ALLOC_BYTES_NAME);
 
-            return addGCAllocAttributes(intrinsic, context.getLLVMContext());
-        });
+        return addGCAllocAttributes(intrinsic, context.getLLVMContext());
+    });
 
-    const IntrinsicDescription newGCFrame(
-        NEW_GC_FRAME_NAME,
-        [](const JuliaPassContext &context) {
-            auto intrinsic = Function::Create(
-                FunctionType::get(PointerType::get(context.T_prjlvalue, 0), {context.T_int32}, false),
-                Function::ExternalLinkage,
-                NEW_GC_FRAME_NAME);
-            intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NoAlias);
-            intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
+const IntrinsicDescription
+    newGCFrame(NEW_GC_FRAME_NAME, [](const JuliaPassContext &context) {
+        auto intrinsic =
+            Function::Create(FunctionType::get(PointerType::get(context.T_prjlvalue, 0),
+                                               {context.T_int32}, false),
+                             Function::ExternalLinkage, NEW_GC_FRAME_NAME);
+        intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NoAlias);
+        intrinsic->addAttribute(AttributeList::ReturnIndex, Attribute::NonNull);
 
-            return intrinsic;
-        });
+        return intrinsic;
+    });
 
-    const IntrinsicDescription pushGCFrame(
-        PUSH_GC_FRAME_NAME,
-        [](const JuliaPassContext &context) {
-            return Function::Create(
-                FunctionType::get(
-                    Type::getVoidTy(context.getLLVMContext()),
-                    {PointerType::get(context.T_prjlvalue, 0), context.T_int32},
-                    false),
-                Function::ExternalLinkage,
-                PUSH_GC_FRAME_NAME);
-        });
+const IntrinsicDescription
+    pushGCFrame(PUSH_GC_FRAME_NAME, [](const JuliaPassContext &context) {
+        return Function::Create(
+            FunctionType::get(Type::getVoidTy(context.getLLVMContext()),
+                              {PointerType::get(context.T_prjlvalue, 0), context.T_int32},
+                              false),
+            Function::ExternalLinkage, PUSH_GC_FRAME_NAME);
+    });
 
-    const IntrinsicDescription popGCFrame(
-        POP_GC_FRAME_NAME,
-        [](const JuliaPassContext &context) {
-            return Function::Create(
-                FunctionType::get(
-                    Type::getVoidTy(context.getLLVMContext()),
-                    {PointerType::get(context.T_prjlvalue, 0)},
-                    false),
-                Function::ExternalLinkage,
-                POP_GC_FRAME_NAME);
-        });
+const IntrinsicDescription
+    popGCFrame(POP_GC_FRAME_NAME, [](const JuliaPassContext &context) {
+        return Function::Create(
+            FunctionType::get(Type::getVoidTy(context.getLLVMContext()),
+                              {PointerType::get(context.T_prjlvalue, 0)}, false),
+            Function::ExternalLinkage, POP_GC_FRAME_NAME);
+    });
 
-    const IntrinsicDescription queueGCRoot(
-        QUEUE_GC_ROOT_NAME,
-        [](const JuliaPassContext &context) {
-            auto intrinsic = Function::Create(
-                FunctionType::get(
-                    Type::getVoidTy(context.getLLVMContext()),
-                    { context.T_prjlvalue },
-                    false),
-                Function::ExternalLinkage,
-                QUEUE_GC_ROOT_NAME);
-            intrinsic->addFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
-            return intrinsic;
-        });
+const IntrinsicDescription
+    queueGCRoot(QUEUE_GC_ROOT_NAME, [](const JuliaPassContext &context) {
+        auto intrinsic =
+            Function::Create(FunctionType::get(Type::getVoidTy(context.getLLVMContext()),
+                                               {context.T_prjlvalue}, false),
+                             Function::ExternalLinkage, QUEUE_GC_ROOT_NAME);
+        intrinsic->addFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+        return intrinsic;
+    });
 }
 
 namespace jl_well_known {
-    static const char *GC_BIG_ALLOC_NAME = "jl_gc_big_alloc";
-    static const char *GC_POOL_ALLOC_NAME = "jl_gc_pool_alloc";
-    static const char *GC_QUEUE_ROOT_NAME = "jl_gc_queue_root";
+static const char *GC_BIG_ALLOC_NAME = "jl_gc_big_alloc";
+static const char *GC_POOL_ALLOC_NAME = "jl_gc_pool_alloc";
+static const char *GC_QUEUE_ROOT_NAME = "jl_gc_queue_root";
 
-    using jl_intrinsics::addGCAllocAttributes;
+using jl_intrinsics::addGCAllocAttributes;
 
-    const WellKnownFunctionDescription GCBigAlloc(
-        GC_BIG_ALLOC_NAME,
-        [](const JuliaPassContext &context) {
-            auto bigAllocFunc = Function::Create(
-                FunctionType::get(
-                    context.T_prjlvalue,
-                    { context.T_pint8, context.T_size },
-                    false),
-                Function::ExternalLinkage,
-                GC_BIG_ALLOC_NAME);
+const WellKnownFunctionDescription
+    GCBigAlloc(GC_BIG_ALLOC_NAME, [](const JuliaPassContext &context) {
+        auto bigAllocFunc =
+            Function::Create(FunctionType::get(context.T_prjlvalue,
+                                               {context.T_pint8, context.T_size}, false),
+                             Function::ExternalLinkage, GC_BIG_ALLOC_NAME);
 
-            return addGCAllocAttributes(bigAllocFunc, context.getLLVMContext());
-        });
+        return addGCAllocAttributes(bigAllocFunc, context.getLLVMContext());
+    });
 
-    const WellKnownFunctionDescription GCPoolAlloc(
-        GC_POOL_ALLOC_NAME,
-        [](const JuliaPassContext &context) {
-            auto poolAllocFunc = Function::Create(
-                FunctionType::get(
-                    context.T_prjlvalue,
-                    { context.T_pint8, context.T_int32, context.T_int32 },
-                    false),
-                Function::ExternalLinkage,
-                GC_POOL_ALLOC_NAME);
+const WellKnownFunctionDescription
+    GCPoolAlloc(GC_POOL_ALLOC_NAME, [](const JuliaPassContext &context) {
+        auto poolAllocFunc = Function::Create(
+            FunctionType::get(context.T_prjlvalue,
+                              {context.T_pint8, context.T_int32, context.T_int32}, false),
+            Function::ExternalLinkage, GC_POOL_ALLOC_NAME);
 
-            return addGCAllocAttributes(poolAllocFunc, context.getLLVMContext());
-        });
+        return addGCAllocAttributes(poolAllocFunc, context.getLLVMContext());
+    });
 
-    const WellKnownFunctionDescription GCQueueRoot(
-        GC_QUEUE_ROOT_NAME,
-        [](const JuliaPassContext &context) {
-            auto func = Function::Create(
-                FunctionType::get(
-                    Type::getVoidTy(context.getLLVMContext()),
-                    { context.T_prjlvalue },
-                    false),
-                Function::ExternalLinkage,
-                GC_QUEUE_ROOT_NAME);
-            func->addFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
-            return func;
-        });
+const WellKnownFunctionDescription
+    GCQueueRoot(GC_QUEUE_ROOT_NAME, [](const JuliaPassContext &context) {
+        auto func =
+            Function::Create(FunctionType::get(Type::getVoidTy(context.getLLVMContext()),
+                                               {context.T_prjlvalue}, false),
+                             Function::ExternalLinkage, GC_QUEUE_ROOT_NAME);
+        func->addFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
+        return func;
+    });
 }

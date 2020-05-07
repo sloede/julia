@@ -11,8 +11,8 @@
 #include "julia.h"
 #include "julia_internal.h"
 
-#include <map>
 #include <algorithm>
+#include <map>
 
 #include "julia_assert.h"
 
@@ -26,8 +26,8 @@
 // and feature is matching register size between the sysimg and JIT so that SIMD vectors
 // can be passed correctly. This means disabling AVX and AVX2 if AVX was not enabled
 // in sysimg and disabling AVX512 if it was not enabled in sysimg.
-// This also possibly means that SVE needs to be disabled on AArch64 if sysimg doesn't have it
-// enabled.
+// This also possibly means that SVE needs to be disabled on AArch64 if sysimg doesn't have
+// it enabled.
 
 // CPU dispatch starts by first deciding the max feature set and CPU requested for JIT.
 // This is the host or the target specified on the command line with features unavailable
@@ -42,9 +42,9 @@
 
 // If there are still more than one candidates, a feature match is performed.
 // The ones with the largest register size will be used
-// (i.e. AVX512 > AVX2/AVX > SSE, SVE > ASIMD). If there's a tie, the one with the most features
-// enabled will be used. If there's still a tie the one that appears later in the list will be
-// used. (i.e. the order in the version list is significant in this case).
+// (i.e. AVX512 > AVX2/AVX > SSE, SVE > ASIMD). If there's a tie, the one with the most
+// features enabled will be used. If there's still a tie the one that appears later in the
+// list will be used. (i.e. the order in the version list is significant in this case).
 
 // Features that are not recognized will be passed to LLVM directly during codegen
 // but ignored otherwise.
@@ -61,8 +61,8 @@
 //     This specifies the (0-based) base target index. The base target is the target
 //     that the current target is based on, i.e. the functions that are not being cloned
 //     will use the version in the base target. This option causes the base target to be
-//     fully cloned (as if `clone_all` is specified for it) if it is not the default target (0).
-//     The index can only be smaller than the current index.
+//     fully cloned (as if `clone_all` is specified for it) if it is not the default target
+//     (0). The index can only be smaller than the current index.
 //
 // 3. `opt_size`
 //
@@ -135,14 +135,8 @@ static inline void set_bit(T &bits, T1 _bitidx, bool val)
 template<size_t n>
 struct FeatureList {
     uint32_t eles[n];
-    uint32_t &operator[](size_t pos)
-    {
-        return eles[pos];
-    }
-    constexpr const uint32_t &operator[](size_t pos) const
-    {
-        return eles[pos];
-    }
+    uint32_t &operator[](size_t pos) { return eles[pos]; }
+    constexpr const uint32_t &operator[](size_t pos) const { return eles[pos]; }
     inline int nbits() const
     {
         int cnt = 0;
@@ -167,11 +161,12 @@ static inline constexpr uint32_t add_feature_mask_u32(uint32_t mask, uint32_t u3
 }
 
 template<typename T, typename... Rest>
-static inline constexpr uint32_t add_feature_mask_u32(uint32_t mask, uint32_t u32idx,
-                                                      T bit, Rest... args)
+static inline constexpr uint32_t add_feature_mask_u32(uint32_t mask, uint32_t u32idx, T bit,
+                                                      Rest... args)
 {
     return add_feature_mask_u32(mask | ((int(bit) >= 0 && int(bit) / 32 == (int)u32idx) ?
-                                        (1 << (int(bit) % 32)) : 0),
+                                            (1 << (int(bit) % 32)) :
+                                            0),
                                 u32idx, args...);
 }
 
@@ -181,15 +176,18 @@ static inline constexpr uint32_t get_feature_mask_u32(uint32_t u32idx, Args... a
     return add_feature_mask_u32(uint32_t(0), u32idx, args...);
 }
 
-template<uint32_t... Is> struct seq{};
-template<uint32_t N, uint32_t... Is>
-struct gen_seq : gen_seq<N-1, N-1, Is...>{};
 template<uint32_t... Is>
-struct gen_seq<0, Is...> : seq<Is...>{};
+struct seq {
+};
+template<uint32_t N, uint32_t... Is>
+struct gen_seq : gen_seq<N - 1, N - 1, Is...> {
+};
+template<uint32_t... Is>
+struct gen_seq<0, Is...> : seq<Is...> {
+};
 
 template<size_t n, uint32_t... I, typename... Args>
-static inline constexpr FeatureList<n>
-_get_feature_mask(seq<I...>, Args... args)
+static inline constexpr FeatureList<n> _get_feature_mask(seq<I...>, Args... args)
 {
     return FeatureList<n>{{get_feature_mask_u32(I, args...)...}};
 }
@@ -201,34 +199,35 @@ static inline constexpr FeatureList<n> get_feature_masks(Args... args)
 }
 
 template<size_t n, uint32_t... I>
-static inline constexpr FeatureList<n>
-_feature_mask_or(seq<I...>, const FeatureList<n> &a, const FeatureList<n> &b)
+static inline constexpr FeatureList<n> _feature_mask_or(seq<I...>, const FeatureList<n> &a,
+                                                        const FeatureList<n> &b)
 {
     return FeatureList<n>{{(a[I] | b[I])...}};
 }
 
 template<size_t n>
-static inline constexpr FeatureList<n> operator|(const FeatureList<n> &a, const FeatureList<n> &b)
+static inline constexpr FeatureList<n> operator|(const FeatureList<n> &a,
+                                                 const FeatureList<n> &b)
 {
     return _feature_mask_or<n>(gen_seq<n>(), a, b);
 }
 
 template<size_t n, uint32_t... I>
-static inline constexpr FeatureList<n>
-_feature_mask_and(seq<I...>, const FeatureList<n> &a, const FeatureList<n> &b)
+static inline constexpr FeatureList<n> _feature_mask_and(seq<I...>, const FeatureList<n> &a,
+                                                         const FeatureList<n> &b)
 {
     return FeatureList<n>{{(a[I] & b[I])...}};
 }
 
 template<size_t n>
-static inline constexpr FeatureList<n> operator&(const FeatureList<n> &a, const FeatureList<n> &b)
+static inline constexpr FeatureList<n> operator&(const FeatureList<n> &a,
+                                                 const FeatureList<n> &b)
 {
     return _feature_mask_and<n>(gen_seq<n>(), a, b);
 }
 
 template<size_t n, uint32_t... I>
-static inline constexpr FeatureList<n>
-_feature_mask_not(seq<I...>, const FeatureList<n> &a)
+static inline constexpr FeatureList<n> _feature_mask_not(seq<I...>, const FeatureList<n> &a)
 {
     return FeatureList<n>{{(~a[I])...}};
 }
@@ -259,7 +258,8 @@ static inline std::string join_feature_strs(const std::vector<std::string> &strs
     return str;
 }
 
-static inline void append_ext_features(std::string &features, const std::string &ext_features)
+static inline void append_ext_features(std::string &features,
+                                       const std::string &ext_features)
 {
     if (ext_features.empty())
         return;
@@ -312,7 +312,8 @@ struct FeatureDep {
 
 // Recursively enable all features that the current feature set depends on.
 template<size_t n>
-static inline void enable_depends(FeatureList<n> &features, const FeatureDep *deps, size_t ndeps)
+static inline void enable_depends(FeatureList<n> &features, const FeatureDep *deps,
+                                  size_t ndeps)
 {
     bool changed = true;
     while (changed) {
@@ -329,7 +330,8 @@ static inline void enable_depends(FeatureList<n> &features, const FeatureDep *de
 
 // Recursively disable all features that the current feature set does not provide.
 template<size_t n>
-static inline void disable_depends(FeatureList<n> &features, const FeatureDep *deps, size_t ndeps)
+static inline void disable_depends(FeatureList<n> &features, const FeatureDep *deps,
+                                   size_t ndeps)
 {
     bool changed = true;
     while (changed) {
@@ -345,7 +347,8 @@ static inline void disable_depends(FeatureList<n> &features, const FeatureDep *d
 }
 
 template<typename CPU, size_t n>
-static const CPUSpec<CPU,n> *find_cpu(uint32_t cpu, const CPUSpec<CPU,n> *cpus, uint32_t ncpus)
+static const CPUSpec<CPU, n> *find_cpu(uint32_t cpu, const CPUSpec<CPU, n> *cpus,
+                                       uint32_t ncpus)
 {
     for (uint32_t i = 0; i < ncpus; i++) {
         if (cpu == uint32_t(cpus[i].cpu)) {
@@ -356,8 +359,8 @@ static const CPUSpec<CPU,n> *find_cpu(uint32_t cpu, const CPUSpec<CPU,n> *cpus, 
 }
 
 template<typename CPU, size_t n>
-static const CPUSpec<CPU,n> *find_cpu(llvm::StringRef name, const CPUSpec<CPU,n> *cpus,
-                                      uint32_t ncpus)
+static const CPUSpec<CPU, n> *find_cpu(llvm::StringRef name, const CPUSpec<CPU, n> *cpus,
+                                       uint32_t ncpus)
 {
     for (uint32_t i = 0; i < ncpus; i++) {
         if (name == cpus[i].name) {
@@ -368,7 +371,7 @@ static const CPUSpec<CPU,n> *find_cpu(llvm::StringRef name, const CPUSpec<CPU,n>
 }
 
 template<typename CPU, size_t n>
-static const char *find_cpu_name(uint32_t cpu, const CPUSpec<CPU,n> *cpus, uint32_t ncpus)
+static const char *find_cpu_name(uint32_t cpu, const CPUSpec<CPU, n> *cpus, uint32_t ncpus)
 {
     if (auto *spec = find_cpu(cpu, cpus, ncpus))
         return spec->name;
@@ -390,16 +393,15 @@ JL_UNUSED static uint32_t find_feature_bit(const FeatureName *features, size_t n
 // This is how we save the target identification.
 // CPU name is saved as string instead of binary data like features because
 // 1. CPU ID is less stable (they are not bound to hardware/OS API)
-// 2. We need to support CPU names that are not recognized by us and therefore doesn't have an ID
+// 2. We need to support CPU names that are not recognized by us and therefore doesn't have
+// an ID
 // 3. CPU name is trivial to parse
-static inline std::vector<uint8_t> serialize_target_data(llvm::StringRef name,
-                                                         uint32_t nfeature,
-                                                         const uint32_t *features_en,
-                                                         const uint32_t *features_dis,
-                                                         llvm::StringRef ext_features)
+static inline std::vector<uint8_t>
+serialize_target_data(llvm::StringRef name, uint32_t nfeature, const uint32_t *features_en,
+                      const uint32_t *features_dis, llvm::StringRef ext_features)
 {
     std::vector<uint8_t> res;
-    auto add_data = [&] (const void *data, size_t sz) {
+    auto add_data = [&](const void *data, size_t sz) {
         size_t old_sz = res.size();
         res.resize(old_sz + sz);
         memcpy(&res[old_sz], data, sz);
@@ -417,10 +419,9 @@ static inline std::vector<uint8_t> serialize_target_data(llvm::StringRef name,
 }
 
 template<size_t n>
-static inline std::vector<uint8_t> serialize_target_data(llvm::StringRef name,
-                                                         const FeatureList<n> &features_en,
-                                                         const FeatureList<n> &features_dis,
-                                                         llvm::StringRef ext_features)
+static inline std::vector<uint8_t>
+serialize_target_data(llvm::StringRef name, const FeatureList<n> &features_en,
+                      const FeatureList<n> &features_dis, llvm::StringRef ext_features)
 {
     return serialize_target_data(name, n, &features_en[0], &features_dis[0], ext_features);
 }
@@ -436,19 +437,19 @@ struct TargetData {
     int base;
 };
 
-// In addition to the serialized data, the first `uint32_t` gives the number of targets saved
-// and each target has a `uint32_t` flag before the serialized target data.
+// In addition to the serialized data, the first `uint32_t` gives the number of targets
+// saved and each target has a `uint32_t` flag before the serialized target data.
 template<size_t n>
 static inline std::vector<TargetData<n>> deserialize_target_data(const uint8_t *data)
 {
-    auto load_data = [&] (void *dest, size_t sz) {
+    auto load_data = [&](void *dest, size_t sz) {
         memcpy(dest, data, sz);
         data += sz;
     };
-    auto load_string = [&] () {
+    auto load_string = [&]() {
         uint32_t len;
         load_data(&len, 4);
-        std::string res((const char*)data, len);
+        std::string res((const char *)data, len);
         data += len;
         return res;
     };
@@ -496,8 +497,7 @@ static inline int get_clone_base(const char *start, const char *end)
 // Parse cmdline string. This handles `clone_all` and `base` special features.
 // Other feature names will be passed to `feature_cb` for target dependent parsing.
 template<size_t n, typename F>
-static inline std::vector<TargetData<n>>
-parse_cmdline(const char *option, F &&feature_cb)
+static inline std::vector<TargetData<n>> parse_cmdline(const char *option, F &&feature_cb)
 {
     if (!option)
         option = "native";
@@ -513,7 +513,7 @@ parse_cmdline(const char *option, F &&feature_cb)
         arg.dis.flags = 0;
     };
     const char *start = option;
-    for (const char *p = option; ; p++) {
+    for (const char *p = option;; p++) {
         switch (*p) {
         case ',':
         case ';':
@@ -560,14 +560,16 @@ parse_cmdline(const char *option, F &&feature_cb)
                 if (disable)
                     jl_error("Invalid target option: disabled opt_size.");
                 if (arg.en.flags & JL_TARGET_MINSIZE)
-                    jl_error("Conflicting target option: both opt_size and min_size are specified.");
+                    jl_error(
+                        "Conflicting target option: both opt_size and min_size are specified.");
                 arg.en.flags |= JL_TARGET_OPTSIZE;
             }
             else if (llvm::StringRef(fname, p - fname) == "min_size") {
                 if (disable)
                     jl_error("Invalid target option: disabled min_size.");
                 if (arg.en.flags & JL_TARGET_OPTSIZE)
-                    jl_error("Conflicting target option: both opt_size and min_size are specified.");
+                    jl_error(
+                        "Conflicting target option: both opt_size and min_size are specified.");
                 arg.en.flags |= JL_TARGET_MINSIZE;
             }
             else if (int base = get_clone_base(fname, p)) {
@@ -575,7 +577,8 @@ parse_cmdline(const char *option, F &&feature_cb)
                     jl_error("Invalid target option: disabled base index.");
                 base -= 1;
                 if (base >= (int)res.size())
-                    jl_error("Invalid target option: base index must refer to a previous target.");
+                    jl_error(
+                        "Invalid target option: base index must refer to a previous target.");
                 if (res[base].dis.flags & JL_TARGET_CLONE_ALL ||
                     !(res[base].en.flags & JL_TARGET_CLONE_ALL))
                     jl_error("Invalid target option: base target must be clone_all.");
@@ -600,8 +603,7 @@ parse_cmdline(const char *option, F &&feature_cb)
             }
         }
             JL_FALLTHROUGH;
-        default:
-            continue;
+        default: continue;
         }
     }
 }
@@ -624,14 +626,14 @@ static inline jl_sysimg_fptrs_t parse_sysimg(void *hdl, F &&callback)
 
     // .data base
     char *data_base;
-    jl_dlsym(hdl, "jl_sysimg_gvars_base", (void**)&data_base, 1);
+    jl_dlsym(hdl, "jl_sysimg_gvars_base", (void **)&data_base, 1);
     // .text base
     char *text_base;
-    jl_dlsym(hdl, "jl_sysimg_fvars_base", (void**)&text_base, 1);
+    jl_dlsym(hdl, "jl_sysimg_fvars_base", (void **)&text_base, 1);
     res.base = text_base;
 
     int32_t *offsets;
-    jl_dlsym(hdl, "jl_sysimg_fvars_offsets", (void**)&offsets, 1);
+    jl_dlsym(hdl, "jl_sysimg_fvars_offsets", (void **)&offsets, 1);
     uint32_t nfunc = offsets[0];
     res.offsets = offsets + 1;
 
@@ -645,15 +647,15 @@ static inline jl_sysimg_fptrs_t parse_sysimg(void *hdl, F &&callback)
     reloc_slots += 1;
     uint32_t *clone_idxs;
     int32_t *clone_offsets;
-    jl_dlsym(hdl, "jl_dispatch_fvars_idxs", (void**)&clone_idxs, 1);
-    jl_dlsym(hdl, "jl_dispatch_fvars_offsets", (void**)&clone_offsets, 1);
+    jl_dlsym(hdl, "jl_dispatch_fvars_idxs", (void **)&clone_idxs, 1);
+    jl_dlsym(hdl, "jl_dispatch_fvars_offsets", (void **)&clone_offsets, 1);
     uint32_t tag_len = clone_idxs[0];
     clone_idxs += 1;
 
     assert(tag_len & jl_sysimg_tag_mask);
-    std::vector<const int32_t*> base_offsets = {res.offsets};
+    std::vector<const int32_t *> base_offsets = {res.offsets};
     // Find target
-    for (uint32_t i = 0;i < target_idx;i++) {
+    for (uint32_t i = 0; i < target_idx; i++) {
         uint32_t len = jl_sysimg_val_mask & tag_len;
         if (jl_sysimg_tag_mask & tag_len) {
             if (i != 0)
@@ -706,10 +708,10 @@ static inline jl_sysimg_fptrs_t parse_sysimg(void *hdl, F &&callback)
         }
         bool found = false;
         for (; reloc_i < nreloc; reloc_i++) {
-            auto reloc_idx = ((const uint32_t*)reloc_slots)[reloc_i * 2];
+            auto reloc_idx = ((const uint32_t *)reloc_slots)[reloc_i * 2];
             if (reloc_idx == idx) {
                 found = true;
-                auto slot = (const void**)(data_base + reloc_slots[reloc_i * 2 + 1]);
+                auto slot = (const void **)(data_base + reloc_slots[reloc_i * 2 + 1]);
                 *slot = offset + res.base;
             }
             else if (reloc_idx > idx) {
@@ -755,7 +757,8 @@ struct SysimgMatch {
 };
 
 // Find the best match in the sysimg.
-// Select the best one based on the largest vector register and largest compatible feature set.
+// Select the best one based on the largest vector register and largest compatible feature
+// set.
 template<typename S, typename T, typename F>
 static inline SysimgMatch match_sysimg_targets(S &&sysimg, T &&target, F &&max_vector_size)
 {
@@ -805,10 +808,10 @@ static inline SysimgMatch match_sysimg_targets(S &&sysimg, T &&target, F &&max_v
 template<typename CPU, size_t n>
 static inline void dump_cpu_spec(uint32_t cpu, const FeatureList<n> &features,
                                  const FeatureName *feature_names, uint32_t nfeature_names,
-                                 const CPUSpec<CPU,n> *cpus, uint32_t ncpus)
+                                 const CPUSpec<CPU, n> *cpus, uint32_t ncpus)
 {
     bool cpu_found = false;
-    for (uint32_t i = 0;i < ncpus;i++) {
+    for (uint32_t i = 0; i < ncpus; i++) {
         if (cpu == uint32_t(cpus[i].cpu)) {
             cpu_found = true;
             jl_safe_printf("CPU: %s\n", cpus[i].name);
@@ -819,7 +822,7 @@ static inline void dump_cpu_spec(uint32_t cpu, const FeatureList<n> &features,
         jl_safe_printf("CPU: generic\n");
     jl_safe_printf("Features:");
     bool first = true;
-    for (uint32_t i = 0;i < nfeature_names;i++) {
+    for (uint32_t i = 0; i < nfeature_names; i++) {
         if (test_nbit(&features[0], feature_names[i].bit)) {
             if (first) {
                 jl_safe_printf(" %s", feature_names[i].name);

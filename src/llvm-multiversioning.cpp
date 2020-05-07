@@ -11,18 +11,17 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 
-#include <llvm/Pass.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Analysis/CallGraph.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/IRBuilder.h>
+#include <llvm/Analysis/LoopInfo.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfoMetadata.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Pass.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "julia.h"
@@ -40,8 +39,8 @@
 
 using namespace llvm;
 
-extern std::pair<MDNode*,MDNode*> tbaa_make_child(const char *name, MDNode *parent=nullptr,
-                                                  bool isConstant=false);
+extern std::pair<MDNode *, MDNode *>
+tbaa_make_child(const char *name, MDNode *parent = nullptr, bool isConstant = false);
 
 namespace {
 
@@ -55,7 +54,7 @@ struct MultiVersioning;
 // We mainly need this to identify cloned function using value map after LLVM cloning
 // functions fills the map with identity entries.
 template<typename T>
-Value *map_get(T &&vmap, Value *key, Value *def=nullptr)
+Value *map_get(T &&vmap, Value *key, Value *def = nullptr)
 {
     auto val = vmap.lookup(key);
     if (!val || key == val)
@@ -76,30 +75,25 @@ struct ConstantUses {
         // This specify whether the original value appears in the current value in exactly
         // the same bit pattern (with possibly an offset determined by `offset`).
         bool samebits;
-        Info(Use *use, T *val, size_t offset, bool samebits) :
-            use(use),
-            val(val),
-            offset(offset),
-            samebits(samebits)
+        Info(Use *use, T *val, size_t offset, bool samebits)
+          : use(use), val(val), offset(offset), samebits(samebits)
         {
         }
-        Info(Use *use, size_t offset, bool samebits) :
-            use(use),
-            val(cast<T>(use->getUser())),
-            offset(offset),
-            samebits(samebits)
+        Info(Use *use, size_t offset, bool samebits)
+          : use(use), val(cast<T>(use->getUser())), offset(offset), samebits(samebits)
         {
         }
     };
     using UseInfo = Info<U>;
     struct Frame : Info<Constant> {
         template<typename... Args>
-        Frame(Args &&... args) :
-            Info<Constant>(std::forward<Args>(args)...),
+        Frame(Args &&... args)
+          : Info<Constant>(std::forward<Args>(args)...),
             cur(this->val->use_empty() ? nullptr : &*this->val->use_begin()),
             _next(cur ? cur->getNext() : nullptr)
         {
         }
+
     private:
         void next()
         {
@@ -112,9 +106,7 @@ struct ConstantUses {
         Use *_next;
         friend struct ConstantUses;
     };
-    ConstantUses(Constant *c, Module &M)
-        : stack{Frame(nullptr, c, 0u, true)},
-          M(M)
+    ConstantUses(Constant *c, Module &M) : stack{Frame(nullptr, c, 0u, true)}, M(M)
     {
         forward();
     }
@@ -123,19 +115,14 @@ struct ConstantUses {
         auto &top = stack.back();
         return UseInfo(top.cur, top.offset, top.samebits);
     }
-    const SmallVector<Frame, 4> &get_stack() const
-    {
-        return stack;
-    }
+    const SmallVector<Frame, 4> &get_stack() const { return stack; }
     void next()
     {
         stack.back().next();
         forward();
     }
-    bool done()
-    {
-        return stack.empty();
-    }
+    bool done() { return stack.empty(); }
+
 private:
     void forward();
     SmallVector<Frame, 4> stack;
@@ -156,26 +143,29 @@ void ConstantUses<U>::forward()
         frame = &stack.back();
         return true;
     };
-    auto push = [&] (Use *use, Constant *c, size_t offset, bool samebits) {
+    auto push = [&](Use *use, Constant *c, size_t offset, bool samebits) {
         stack.emplace_back(use, c, offset, samebits);
         frame = &stack.back();
     };
-    auto handle_constaggr = [&] (Use *use, ConstantAggregate *aggr) {
+    auto handle_constaggr = [&](Use *use, ConstantAggregate *aggr) {
         if (!frame->samebits) {
             push(use, aggr, 0, false);
             return;
         }
         if (auto strct = dyn_cast<ConstantStruct>(aggr)) {
             auto layout = DL.getStructLayout(strct->getType());
-            push(use, strct, frame->offset + layout->getElementOffset(use->getOperandNo()), true);
+            push(use, strct, frame->offset + layout->getElementOffset(use->getOperandNo()),
+                 true);
         }
         else if (auto ary = dyn_cast<ConstantArray>(aggr)) {
             auto elty = ary->getType()->getElementType();
-            push(use, ary, frame->offset + DL.getTypeAllocSize(elty) * use->getOperandNo(), true);
+            push(use, ary, frame->offset + DL.getTypeAllocSize(elty) * use->getOperandNo(),
+                 true);
         }
         else if (auto vec = dyn_cast<ConstantVector>(aggr)) {
             auto elty = vec->getType()->getElementType();
-            push(use, vec, frame->offset + DL.getTypeAllocSize(elty) * use->getOperandNo(), true);
+            push(use, vec, frame->offset + DL.getTypeAllocSize(elty) * use->getOperandNo(),
+                 true);
         }
         else {
             jl_safe_printf("Unknown ConstantAggregate:\n");
@@ -183,7 +173,7 @@ void ConstantUses<U>::forward()
             abort();
         }
     };
-    auto handle_constexpr = [&] (Use *use, ConstantExpr *expr) {
+    auto handle_constexpr = [&](Use *use, ConstantExpr *expr) {
         if (!frame->samebits) {
             push(use, expr, 0, false);
             return;
@@ -224,21 +214,18 @@ struct CloneCtx {
         std::unique_ptr<ValueToValueMapTy> vmap; // ValueToValueMapTy is not movable....
         // function ids that needs relocation to be initialized
         std::set<uint32_t> relocs{};
-        Target(int idx, const jl_target_spec_t &spec) :
-            idx(idx),
-            flags(spec.flags),
-            vmap(new ValueToValueMapTy)
+        Target(int idx, const jl_target_spec_t &spec)
+          : idx(idx), flags(spec.flags), vmap(new ValueToValueMapTy)
         {
         }
     };
     struct Group : Target {
         std::vector<Target> clones;
         std::set<uint32_t> clone_fs;
-        Group(int base, const jl_target_spec_t &spec) :
-            Target(base, spec),
-            clones{},
-            clone_fs{}
-        {}
+        Group(int base, const jl_target_spec_t &spec)
+          : Target(base, spec), clones{}, clone_fs{}
+        {
+        }
         Function *base_func(Function *orig_f) const
         {
             if (idx == 0)
@@ -253,6 +240,7 @@ struct CloneCtx {
     void fix_gv_uses();
     void fix_inst_uses();
     void emit_metadata();
+
 private:
     void prepare_vmap(ValueToValueMapTy &vmap);
     bool is_vector(FunctionType *ty) const;
@@ -260,18 +248,19 @@ private:
     uint32_t collect_func_info(Function &F);
     void check_partial(Group &grp, Target &tgt);
     void clone_partial(Group &grp, Target &tgt);
-    void add_features(Function *F, StringRef name, StringRef features, uint32_t flags) const;
+    void add_features(Function *F, StringRef name, StringRef features,
+                      uint32_t flags) const;
     template<typename T>
     T *add_comdat(T *G) const;
     uint32_t get_func_id(Function *F);
     template<typename Stack>
-    Constant *rewrite_gv_init(const Stack& stack);
+    Constant *rewrite_gv_init(const Stack &stack);
     template<typename Stack>
-    Value *rewrite_inst_use(const Stack& stack, Value *replace, Instruction *insert_before);
-    std::pair<uint32_t,GlobalVariable*> get_reloc_slot(Function *F);
+    Value *rewrite_inst_use(const Stack &stack, Value *replace, Instruction *insert_before);
+    std::pair<uint32_t, GlobalVariable *> get_reloc_slot(Function *F);
     Constant *get_ptrdiff32(Constant *ptr, Constant *base) const;
     template<typename T>
-    Constant *emit_offset_table(const std::vector<T*> &vars, StringRef name) const;
+    Constant *emit_offset_table(const std::vector<T *> &vars, StringRef name) const;
 
     LLVMContext &ctx;
     Type *T_size;
@@ -283,27 +272,25 @@ private:
     MultiVersioning *pass;
     std::vector<jl_target_spec_t> specs;
     std::vector<Group> groups{};
-    std::vector<Function*> fvars;
-    std::vector<Constant*> gvars;
+    std::vector<Function *> fvars;
+    std::vector<Constant *> gvars;
     Module &M;
     // Map from original functiton to one based index in `fvars`
-    std::map<const Function*,uint32_t> func_ids{};
-    std::vector<Function*> orig_funcs{};
+    std::map<const Function *, uint32_t> func_ids{};
+    std::vector<Function *> orig_funcs{};
     std::vector<uint32_t> func_infos{};
-    std::set<Function*> cloned{};
+    std::set<Function *> cloned{};
     // GV addresses and their corresponding function id (i.e. 0-based index in `fvars`)
-    std::vector<std::pair<Constant*,uint32_t>> gv_relocs{};
+    std::vector<std::pair<Constant *, uint32_t>> gv_relocs{};
     // Mapping from function id (i.e. 0-based index in `fvars`) to GVs to be initialized.
-    std::map<uint32_t,GlobalVariable*> const_relocs;
+    std::map<uint32_t, GlobalVariable *> const_relocs;
     bool has_veccall{false};
     bool has_cloneall{false};
 };
 
-struct MultiVersioning: public ModulePass {
+struct MultiVersioning : public ModulePass {
     static char ID;
-    MultiVersioning()
-        : ModulePass(ID)
-    {}
+    MultiVersioning() : ModulePass(ID) {}
 
 private:
     bool runOnModule(Module &M) override;
@@ -317,7 +304,7 @@ private:
 };
 
 template<typename T>
-static inline std::vector<T*> consume_gv(Module &M, const char *name)
+static inline std::vector<T *> consume_gv(Module &M, const char *name)
 {
     // Get information about sysimg export functions from the two global variables.
     // Strip them from the Module so that it's easier to handle the uses.
@@ -325,7 +312,7 @@ static inline std::vector<T*> consume_gv(Module &M, const char *name)
     assert(gv && gv->hasInitializer());
     auto *ary = cast<ConstantArray>(gv->getInitializer());
     unsigned nele = ary->getNumOperands();
-    std::vector<T*> res(nele);
+    std::vector<T *> res(nele);
     for (unsigned i = 0; i < nele; i++)
         res[i] = cast<T>(ary->getOperand(i)->stripPointerCasts());
     assert(gv->use_empty());
@@ -337,18 +324,18 @@ static inline std::vector<T*> consume_gv(Module &M, const char *name)
 
 // Collect basic information about targets and functions.
 CloneCtx::CloneCtx(MultiVersioning *pass, Module &M)
-    : ctx(M.getContext()),
-      T_size(M.getDataLayout().getIntPtrType(ctx, 0)),
-      T_int32(Type::getInt32Ty(ctx)),
-      T_void(Type::getVoidTy(ctx)),
-      T_psize(PointerType::get(T_size, 0)),
-      T_pvoidfunc(FunctionType::get(T_void, false)->getPointerTo()),
-      tbaa_const(tbaa_make_child("jtbaa_const", nullptr, true).first),
-      pass(pass),
-      specs(jl_get_llvm_clone_targets()),
-      fvars(consume_gv<Function>(M, "jl_sysimg_fvars")),
-      gvars(consume_gv<Constant>(M, "jl_sysimg_gvars")),
-      M(M)
+  : ctx(M.getContext()),
+    T_size(M.getDataLayout().getIntPtrType(ctx, 0)),
+    T_int32(Type::getInt32Ty(ctx)),
+    T_void(Type::getVoidTy(ctx)),
+    T_psize(PointerType::get(T_size, 0)),
+    T_pvoidfunc(FunctionType::get(T_void, false)->getPointerTo()),
+    tbaa_const(tbaa_make_child("jtbaa_const", nullptr, true).first),
+    pass(pass),
+    specs(jl_get_llvm_clone_targets()),
+    fvars(consume_gv<Function>(M, "jl_sysimg_fvars")),
+    gvars(consume_gv<Constant>(M, "jl_sysimg_gvars")),
+    M(M)
 {
     groups.emplace_back(0, specs[0]);
     uint32_t ntargets = specs.size();
@@ -361,7 +348,7 @@ CloneCtx::CloneCtx(MultiVersioning *pass, Module &M)
         else {
             auto base = spec.base;
             bool found = false;
-            for (auto &grp: groups) {
+            for (auto &grp : groups) {
                 if (grp.idx == base) {
                     found = true;
                     grp.clones.emplace_back(i, spec);
@@ -374,7 +361,7 @@ CloneCtx::CloneCtx(MultiVersioning *pass, Module &M)
     uint32_t nfvars = fvars.size();
     for (uint32_t i = 0; i < nfvars; i++)
         func_ids[fvars[i]] = i + 1;
-    for (auto &F: M) {
+    for (auto &F : M) {
         if (F.empty())
             continue;
         orig_funcs.push_back(&F);
@@ -390,7 +377,7 @@ void CloneCtx::prepare_vmap(ValueToValueMapTy &vmap)
     // The `DISubprogram` cloning on LLVM 5.0 handles this
     // but it doesn't hurt to enforce the identity either.
     auto &MD = vmap.MD();
-    for (auto cu: M.debug_compile_units()) {
+    for (auto cu : M.debug_compile_units()) {
         MD[cu].reset(cu);
     }
 }
@@ -402,7 +389,7 @@ void CloneCtx::clone_function(Function *F, Function *new_f, ValueToValueMapTy &v
         DestI->setName(J->getName());
         vmap[&*J] = &*DestI++;
     }
-    SmallVector<ReturnInst*,8> Returns;
+    SmallVector<ReturnInst *, 8> Returns;
     CloneFunctionInto(new_f, F, vmap, true, Returns);
 }
 
@@ -418,14 +405,14 @@ void CloneCtx::clone_bases()
         auto &vmap = *grp.vmap;
         // Fill in old->new mapping. We need to do this before cloning the function so that
         // the intra target calls are automatically fixed up on cloning.
-        for (auto F: orig_funcs) {
+        for (auto F : orig_funcs) {
             Function *new_f = Function::Create(F->getFunctionType(), F->getLinkage(),
                                                F->getName() + suffix, &M);
             new_f->copyAttributesFrom(F);
             vmap[F] = new_f;
         }
         prepare_vmap(vmap);
-        for (auto F: orig_funcs) {
+        for (auto F : orig_funcs) {
             clone_function(F, cast<Function>(vmap.lookup(F)), vmap);
         }
     }
@@ -435,7 +422,7 @@ bool CloneCtx::is_vector(FunctionType *ty) const
 {
     if (ty->getReturnType()->isVectorTy())
         return true;
-    for (auto arg: ty->params()) {
+    for (auto arg : ty->params()) {
         if (arg->isVectorTy()) {
             return true;
         }
@@ -452,8 +439,8 @@ uint32_t CloneCtx::collect_func_info(Function &F)
         flag |= JL_TARGET_CLONE_SIMD;
         has_veccall = true;
     }
-    for (auto &bb: F) {
-        for (auto &I: bb) {
+    for (auto &bb : F) {
+        for (auto &I : bb) {
             if (auto call = dyn_cast<CallInst>(&I)) {
                 if (is_vector(call->getFunctionType())) {
                     has_veccall = true;
@@ -479,7 +466,8 @@ uint32_t CloneCtx::collect_func_info(Function &F)
                     flag |= JL_TARGET_CLONE_MATH;
                 }
             }
-            if (has_veccall && (flag & JL_TARGET_CLONE_SIMD) && (flag & JL_TARGET_CLONE_MATH)) {
+            if (has_veccall && (flag & JL_TARGET_CLONE_SIMD) &&
+                (flag & JL_TARGET_CLONE_MATH)) {
                 return flag;
             }
         }
@@ -501,20 +489,20 @@ void CloneCtx::clone_all_partials()
     // First decide what to clone
     // Do this before actually cloning the functions
     // so that the call graph is easier to understand
-    for (auto &grp: groups) {
-        for (auto &tgt: grp.clones) {
+    for (auto &grp : groups) {
+        for (auto &tgt : grp.clones) {
             check_partial(grp, tgt);
         }
     }
-    for (auto &grp: groups) {
-        for (auto &tgt: grp.clones)
+    for (auto &grp : groups) {
+        for (auto &tgt : grp.clones)
             clone_partial(grp, tgt);
         // Also set feature strings for base target functions
         // now that all the actual cloning is done.
         auto &base_spec = specs[grp.idx];
-        for (auto orig_f: orig_funcs) {
-            add_features(grp.base_func(orig_f), base_spec.cpu_name,
-                         base_spec.cpu_features, base_spec.flags);
+        for (auto orig_f : orig_funcs) {
+            add_features(grp.base_func(orig_f), base_spec.cpu_name, base_spec.cpu_features,
+                         base_spec.flags);
         }
     }
     func_infos.clear(); // We don't need this anymore
@@ -527,7 +515,7 @@ void CloneCtx::check_partial(Group &grp, Target &tgt)
     auto &vmap = *tgt.vmap;
     uint32_t nfuncs = func_infos.size();
 
-    std::set<Function*> all_origs;
+    std::set<Function *> all_origs;
     // Use a simple heuristic to decide which function we need to clone.
     for (uint32_t i = 0; i < nfuncs; i++) {
         if (!(func_infos[i] & flag))
@@ -545,17 +533,17 @@ void CloneCtx::check_partial(Group &grp, Target &tgt)
         grp.clone_fs.insert(i);
         all_origs.insert(orig_f);
     }
-    std::set<Function*> sets[2]{all_origs, std::set<Function*>{}};
+    std::set<Function *> sets[2]{all_origs, std::set<Function *>{}};
     auto *cur_set = &sets[0];
     auto *next_set = &sets[1];
     // Reduce dispatch by expand the cloning set to functions that are directly called by
     // and calling cloned functions.
     auto &graph = pass->getAnalysis<CallGraphWrapperPass>().getCallGraph();
     while (!cur_set->empty()) {
-        for (auto orig_f: *cur_set) {
+        for (auto orig_f : *cur_set) {
             // Use the uncloned function since it's already in the call graph
             auto node = graph[orig_f];
-            for (const auto &I: *node) {
+            for (const auto &I : *node) {
                 auto child_node = I.second;
                 auto orig_child_f = child_node->getFunction();
                 if (!orig_child_f)
@@ -564,7 +552,7 @@ void CloneCtx::check_partial(Group &grp, Target &tgt)
                 if (all_origs.count(orig_child_f))
                     continue;
                 bool calling_clone = false;
-                for (const auto &I2: *child_node) {
+                for (const auto &I2 : *child_node) {
                     auto orig_child_f2 = I2.second->getFunction();
                     if (!orig_child_f2)
                         continue;
@@ -578,9 +566,9 @@ void CloneCtx::check_partial(Group &grp, Target &tgt)
                 next_set->insert(orig_child_f);
                 all_origs.insert(orig_child_f);
                 auto child_f = grp.base_func(orig_child_f);
-                Function *new_f = Function::Create(child_f->getFunctionType(),
-                                                   child_f->getLinkage(),
-                                                   child_f->getName() + suffix, &M);
+                Function *new_f =
+                    Function::Create(child_f->getFunctionType(), child_f->getLinkage(),
+                                     child_f->getName() + suffix, &M);
                 new_f->copyAttributesFrom(child_f);
                 vmap[child_f] = new_f;
             }
@@ -621,7 +609,8 @@ void CloneCtx::clone_partial(Group &grp, Target &tgt)
     }
 }
 
-void CloneCtx::add_features(Function *F, StringRef name, StringRef features, uint32_t flags) const
+void CloneCtx::add_features(Function *F, StringRef name, StringRef features,
+                            uint32_t flags) const
 {
     auto attr = F->getFnAttribute("target-features");
     if (attr.isStringAttribute()) {
@@ -655,10 +644,10 @@ uint32_t CloneCtx::get_func_id(Function *F)
 }
 
 template<typename Stack>
-Constant *CloneCtx::rewrite_gv_init(const Stack& stack)
+Constant *CloneCtx::rewrite_gv_init(const Stack &stack)
 {
     // Null initialize so that LLVM put it in the correct section.
-    SmallVector<Constant*, 8> args;
+    SmallVector<Constant *, 8> args;
     Constant *res = ConstantPointerNull::get(cast<PointerType>(stack[0].val->getType()));
     uint32_t nlevel = stack.size();
     for (uint32_t i = 1; i < nlevel; i++) {
@@ -699,7 +688,7 @@ Constant *CloneCtx::rewrite_gv_init(const Stack& stack)
 
 void CloneCtx::fix_gv_uses()
 {
-    auto single_pass = [&] (Function *orig_f) {
+    auto single_pass = [&](Function *orig_f) {
         bool changed = false;
         for (auto uses = ConstantUses<GlobalValue>(orig_f, M); !uses.done(); uses.next()) {
             changed = true;
@@ -720,7 +709,7 @@ void CloneCtx::fix_gv_uses()
         }
         return changed;
     };
-    for (auto orig_f: orig_funcs) {
+    for (auto orig_f : orig_funcs) {
         if (!has_cloneall && !cloned.count(orig_f))
             continue;
         while (single_pass(orig_f)) {
@@ -728,7 +717,7 @@ void CloneCtx::fix_gv_uses()
     }
 }
 
-std::pair<uint32_t,GlobalVariable*> CloneCtx::get_reloc_slot(Function *F)
+std::pair<uint32_t, GlobalVariable *> CloneCtx::get_reloc_slot(Function *F)
 {
     // Null initialize so that LLVM put it in the correct section.
     auto id = get_func_id(F);
@@ -741,9 +730,10 @@ std::pair<uint32_t,GlobalVariable*> CloneCtx::get_reloc_slot(Function *F)
 }
 
 template<typename Stack>
-Value *CloneCtx::rewrite_inst_use(const Stack& stack, Value *replace, Instruction *insert_before)
+Value *CloneCtx::rewrite_inst_use(const Stack &stack, Value *replace,
+                                  Instruction *insert_before)
 {
-    SmallVector<Constant*, 8> args;
+    SmallVector<Constant *, 8> args;
     uint32_t nlevel = stack.size();
     for (uint32_t i = 1; i < nlevel; i++) {
         auto &frame = stack[i];
@@ -777,9 +767,9 @@ Value *CloneCtx::rewrite_inst_use(const Stack& stack, Value *replace, Instructio
                                               replace, {idx}, "", insert_before);
         }
         else if (isa<ConstantVector>(val)) {
-            replace = InsertElementInst::Create(ConstantVector::get(args), replace,
-                                                ConstantInt::get(T_size, idx), "",
-                                                insert_before);
+            replace =
+                InsertElementInst::Create(ConstantVector::get(args), replace,
+                                          ConstantInt::get(T_size, idx), "", insert_before);
         }
         else {
             jl_safe_printf("Unknown const use.");
@@ -793,7 +783,7 @@ Value *CloneCtx::rewrite_inst_use(const Stack& stack, Value *replace, Instructio
 void CloneCtx::fix_inst_uses()
 {
     uint32_t nfuncs = orig_funcs.size();
-    for (auto &grp: groups) {
+    for (auto &grp : groups) {
         auto suffix = ".clone_" + std::to_string(grp.idx);
         for (uint32_t i = 0; i < nfuncs; i++) {
             if (!grp.clone_fs.count(i))
@@ -803,7 +793,8 @@ void CloneCtx::fix_inst_uses()
             bool changed;
             do {
                 changed = false;
-                for (auto uses = ConstantUses<Instruction>(F, M); !uses.done(); uses.next()) {
+                for (auto uses = ConstantUses<Instruction>(F, M); !uses.done();
+                     uses.next()) {
                     auto info = uses.get_info();
                     auto use_i = info.val;
                     auto use_f = use_i->getFunction();
@@ -815,16 +806,18 @@ void CloneCtx::fix_inst_uses()
                     uint32_t id;
                     GlobalVariable *slot;
                     std::tie(id, slot) = get_reloc_slot(orig_f);
-                    Instruction *ptr = new LoadInst(T_pvoidfunc, slot, "", false, insert_before);
+                    Instruction *ptr =
+                        new LoadInst(T_pvoidfunc, slot, "", false, insert_before);
                     ptr->setMetadata(llvm::LLVMContext::MD_tbaa, tbaa_const);
-                    ptr->setMetadata(llvm::LLVMContext::MD_invariant_load, MDNode::get(ctx, None));
+                    ptr->setMetadata(llvm::LLVMContext::MD_invariant_load,
+                                     MDNode::get(ctx, None));
                     ptr = new BitCastInst(ptr, F->getType(), "", insert_before);
                     use_i->setOperand(info.use->getOperandNo(),
                                       rewrite_inst_use(uses.get_stack(), ptr,
                                                        insert_before));
 
                     grp.relocs.insert(id);
-                    for (auto &tgt: grp.clones) {
+                    for (auto &tgt : grp.clones) {
                         // The enclosing function of the use is cloned,
                         // no need to deal with this use on this target.
                         if (map_get(*tgt.vmap, use_f))
@@ -866,11 +859,11 @@ Constant *CloneCtx::get_ptrdiff32(Constant *ptr, Constant *base) const
     if (ptr->getType()->isPointerTy())
         ptr = ConstantExpr::getPtrToInt(ptr, T_size);
     auto ptrdiff = ConstantExpr::getSub(ptr, base);
-    return sizeof(void*) == 8 ? ConstantExpr::getTrunc(ptrdiff, T_int32) : ptrdiff;
+    return sizeof(void *) == 8 ? ConstantExpr::getTrunc(ptrdiff, T_int32) : ptrdiff;
 }
 
 template<typename T>
-Constant *CloneCtx::emit_offset_table(const std::vector<T*> &vars, StringRef name) const
+Constant *CloneCtx::emit_offset_table(const std::vector<T *> &vars, StringRef name) const
 {
     assert(!vars.empty());
     add_comdat(GlobalAlias::create(T_size, 0, GlobalVariable::ExternalLinkage,
@@ -878,14 +871,13 @@ Constant *CloneCtx::emit_offset_table(const std::vector<T*> &vars, StringRef nam
                                    ConstantExpr::getBitCast(vars[0], T_psize), &M));
     auto vbase = ConstantExpr::getPtrToInt(vars[0], T_size);
     uint32_t nvars = vars.size();
-    std::vector<Constant*> offsets(nvars + 1);
+    std::vector<Constant *> offsets(nvars + 1);
     offsets[0] = ConstantInt::get(T_int32, nvars);
     offsets[1] = ConstantInt::get(T_int32, 0);
     for (uint32_t i = 1; i < nvars; i++)
         offsets[i + 1] = get_ptrdiff32(vars[i], vbase);
     ArrayType *vars_type = ArrayType::get(T_int32, nvars + 1);
-    add_comdat(new GlobalVariable(M, vars_type, true,
-                                  GlobalVariable::ExternalLinkage,
+    add_comdat(new GlobalVariable(M, vars_type, true, GlobalVariable::ExternalLinkage,
                                   ConstantArray::get(vars_type, offsets),
                                   name + "_offsets"));
     return vbase;
@@ -899,10 +891,10 @@ void CloneCtx::emit_metadata()
     uint32_t nfvars = fvars.size();
 
     uint32_t ntargets = specs.size();
-    SmallVector<Target*, 8> targets(ntargets);
-    for (auto &grp: groups) {
+    SmallVector<Target *, 8> targets(ntargets);
+    for (auto &grp : groups) {
         targets[grp.idx] = &grp;
-        for (auto &tgt: grp.clones) {
+        for (auto &tgt : grp.clones) {
             targets[tgt.idx] = &tgt;
         }
     }
@@ -911,7 +903,7 @@ void CloneCtx::emit_metadata()
     {
         const uint32_t base_flags = has_veccall ? JL_TARGET_VEC_CALL : 0;
         std::vector<uint8_t> data;
-        auto push_i32 = [&] (uint32_t v) {
+        auto push_i32 = [&](uint32_t v) {
             uint8_t buff[4];
             memcpy(buff, &v, 4);
             data.insert(data.end(), buff, buff + 4);
@@ -924,19 +916,19 @@ void CloneCtx::emit_metadata()
         }
         auto value = ConstantDataArray::get(ctx, data);
         add_comdat(new GlobalVariable(M, value->getType(), true,
-                                      GlobalVariable::ExternalLinkage,
-                                      value, "jl_dispatch_target_ids"));
+                                      GlobalVariable::ExternalLinkage, value,
+                                      "jl_dispatch_target_ids"));
     }
 
     // Generate `jl_dispatch_reloc_slots`
     std::set<uint32_t> shared_relocs;
     {
         std::stable_sort(gv_relocs.begin(), gv_relocs.end(),
-                         [] (const std::pair<Constant*,uint32_t> &lhs,
-                             const std::pair<Constant*,uint32_t> &rhs) {
+                         [](const std::pair<Constant *, uint32_t> &lhs,
+                            const std::pair<Constant *, uint32_t> &rhs) {
                              return lhs.second < rhs.second;
                          });
-        std::vector<Constant*> values{nullptr};
+        std::vector<Constant *> values{nullptr};
         uint32_t gv_reloc_idx = 0;
         uint32_t ngv_relocs = gv_relocs.size();
         for (uint32_t id = 0; id < nfvars; id++) {
@@ -966,7 +958,7 @@ void CloneCtx::emit_metadata()
     // Generate `jl_dispatch_fvars_idxs` and `jl_dispatch_fvars_offsets`
     {
         std::vector<uint32_t> idxs;
-        std::vector<Constant*> offsets;
+        std::vector<Constant *> offsets;
         for (uint32_t i = 0; i < ntargets; i++) {
             auto tgt = targets[i];
             auto &spec = specs[i];
@@ -974,7 +966,7 @@ void CloneCtx::emit_metadata()
             idxs.push_back(0); // We will fill in the real value later.
             uint32_t count = 0;
             if (i == 0 || spec.flags & JL_TARGET_CLONE_ALL) {
-                auto grp = static_cast<Group*>(tgt);
+                auto grp = static_cast<Group *>(tgt);
                 count = jl_sysimg_tag_mask;
                 for (uint32_t j = 0; j < nfvars; j++) {
                     if (shared_relocs.count(j) || tgt->relocs.count(j)) {
@@ -988,7 +980,7 @@ void CloneCtx::emit_metadata()
             }
             else {
                 auto baseidx = spec.base;
-                auto grp = static_cast<Group*>(targets[baseidx]);
+                auto grp = static_cast<Group *>(targets[baseidx]);
                 idxs.push_back(baseidx);
                 for (uint32_t j = 0; j < nfvars; j++) {
                     auto base_f = grp->base_func(fvars[j]);
@@ -1009,13 +1001,12 @@ void CloneCtx::emit_metadata()
         }
         auto idxval = ConstantDataArray::get(ctx, idxs);
         add_comdat(new GlobalVariable(M, idxval->getType(), true,
-                                      GlobalVariable::ExternalLinkage,
-                                      idxval, "jl_dispatch_fvars_idxs"));
+                                      GlobalVariable::ExternalLinkage, idxval,
+                                      "jl_dispatch_fvars_idxs"));
         ArrayType *offsets_type = ArrayType::get(T_int32, offsets.size());
-        add_comdat(new GlobalVariable(M, offsets_type, true,
-                                      GlobalVariable::ExternalLinkage,
-                                      ConstantArray::get(offsets_type, offsets),
-                                      "jl_dispatch_fvars_offsets"));
+        add_comdat(new GlobalVariable(
+            M, offsets_type, true, GlobalVariable::ExternalLinkage,
+            ConstantArray::get(offsets_type, offsets), "jl_dispatch_fvars_offsets"));
     }
 }
 
@@ -1040,26 +1031,25 @@ bool MultiVersioning::runOnModule(Module &M)
     // Collect function info (type of instruction used)
     clone.collect_func_infos();
 
-    // If any partially cloned target exist decide which functions to clone for these targets.
-    // Clone functions for each group and collect a list of them.
-    // We can also add feature strings for cloned functions
-    // now that no additional cloning needs to be done.
+    // If any partially cloned target exist decide which functions to clone for these
+    // targets. Clone functions for each group and collect a list of them. We can also add
+    // feature strings for cloned functions now that no additional cloning needs to be done.
     clone.clone_all_partials();
 
     // Scan **ALL** cloned functions (including full cloning for base target)
     // for global variables initialization use.
-    // Replace them with `null` slot to be initialized at runtime and record relocation slot.
-    // These relocations must be initialized for **ALL** targets.
+    // Replace them with `null` slot to be initialized at runtime and record relocation
+    // slot. These relocations must be initialized for **ALL** targets.
     clone.fix_gv_uses();
 
     // For each group, scan all functions cloned by **PARTIALLY** cloned targets for
     // instruction use.
     // A function needs a const relocation slot if it is cloned and is called by a
     // uncloned function for at least one partially cloned target in the group.
-    // This is also the condition that a use in an uncloned function needs to be replaced with
-    // a slot load (i.e. if both the caller and the callee are always cloned or not cloned
-    // on all targets, the caller site does not need a relocation slot).
-    // A target needs a slot to be initialized iff at least one caller is not initialized.
+    // This is also the condition that a use in an uncloned function needs to be replaced
+    // with a slot load (i.e. if both the caller and the callee are always cloned or not
+    // cloned on all targets, the caller site does not need a relocation slot). A target
+    // needs a slot to be initialized iff at least one caller is not initialized.
     clone.fix_inst_uses();
 
     // Store back sysimg information with the correct format.

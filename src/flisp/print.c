@@ -21,7 +21,7 @@ static void outsn(fl_context_t *fl_ctx, const char *s, ios_t *f, size_t n)
 static int outindent(fl_context_t *fl_ctx, int n, ios_t *f)
 {
     // move back to left margin if we get too indented
-    if (n > fl_ctx->SCR_WIDTH-12)
+    if (n > fl_ctx->SCR_WIDTH - 12)
         n = 2;
     int n0 = n;
     ios_putc('\n', f);
@@ -53,7 +53,7 @@ void print_traverse(fl_context_t *fl_ctx, value_t v)
     value_t *bp;
     while (iscons(v)) {
         if (ismarked(fl_ctx, v)) {
-            bp = (value_t*)ptrhash_bp(&fl_ctx->printconses, (void*)v);
+            bp = (value_t *)ptrhash_bp(&fl_ctx->printconses, (void *)v);
             if (*bp == (value_t)HT_NOTFOUND)
                 *bp = fixnum(fl_ctx->printlabel++);
             return;
@@ -65,7 +65,7 @@ void print_traverse(fl_context_t *fl_ctx, value_t v)
     if (!ismanaged(fl_ctx, v) || issymbol(v))
         return;
     if (ismarked(fl_ctx, v)) {
-        bp = (value_t*)ptrhash_bp(&fl_ctx->printconses, (void*)v);
+        bp = (value_t *)ptrhash_bp(&fl_ctx->printconses, (void *)v);
         if (*bp == (value_t)HT_NOTFOUND)
             *bp = fixnum(fl_ctx->printlabel++);
         return;
@@ -74,24 +74,24 @@ void print_traverse(fl_context_t *fl_ctx, value_t v)
         if (vector_size(v) > 0)
             mark_cons(fl_ctx, v);
         unsigned int i;
-        for(i=0; i < vector_size(v); i++)
-            print_traverse(fl_ctx, vector_elt(v,i));
+        for (i = 0; i < vector_size(v); i++)
+            print_traverse(fl_ctx, vector_elt(v, i));
     }
     else if (iscprim(v)) {
         mark_cons(fl_ctx, v);
     }
     else if (isclosure(v)) {
         mark_cons(fl_ctx, v);
-        function_t *f = (function_t*)ptr(v);
+        function_t *f = (function_t *)ptr(v);
         print_traverse(fl_ctx, f->bcode);
         print_traverse(fl_ctx, f->vals);
         print_traverse(fl_ctx, f->env);
     }
     else {
         assert(iscvalue(v));
-        cvalue_t *cv = (cvalue_t*)ptr(v);
+        cvalue_t *cv = (cvalue_t *)ptr(v);
         // don't consider shared references to ""
-        if (!cv_isstr(fl_ctx, cv) || cv_len(cv)!=0)
+        if (!cv_isstr(fl_ctx, cv) || cv_len(cv) != 0)
             mark_cons(fl_ctx, v);
         fltype_t *t = cv_class(cv);
         if (t->vtable != NULL && t->vtable->print_traverse != NULL)
@@ -101,18 +101,16 @@ void print_traverse(fl_context_t *fl_ctx, value_t v)
 
 static void print_symbol_name(fl_context_t *fl_ctx, ios_t *f, char *name)
 {
-    int i, escape=0, charescape=0;
+    int i, escape = 0, charescape = 0;
 
-    if ((name[0] == '\0') ||
-        (name[0] == '.' && name[1] == '\0') ||
-        (name[0] == '#') ||
+    if ((name[0] == '\0') || (name[0] == '.' && name[1] == '\0') || (name[0] == '#') ||
         isnumtok(fl_ctx, name, NULL))
         escape = 1;
-    i=0;
+    i = 0;
     while (name[i]) {
         if (!symchar(name[i])) {
             escape = 1;
-            if (name[i]=='|' || name[i]=='\\') {
+            if (name[i] == '|' || name[i] == '\\') {
                 charescape = 1;
                 break;
             }
@@ -122,9 +120,9 @@ static void print_symbol_name(fl_context_t *fl_ctx, ios_t *f, char *name)
     if (escape) {
         if (charescape) {
             outc(fl_ctx, '|', f);
-            i=0;
+            i = 0;
             while (name[i]) {
-                if (name[i]=='|' || name[i]=='\\')
+                if (name[i] == '|' || name[i] == '\\')
                     outc(fl_ctx, '\\', f);
                 outc(fl_ctx, name[i], f);
                 i++;
@@ -157,27 +155,28 @@ static inline int tinyp(fl_context_t *fl_ctx, value_t v)
     if (issymbol(v))
         return (u8_strwidth(symbol_name(fl_ctx, v)) < SMALL_STR_LEN);
     if (fl_isstring(fl_ctx, v))
-        return (cv_len((cvalue_t*)ptr(v)) < SMALL_STR_LEN);
-    return (isfixnum(v) || isbuiltin(v) || v==fl_ctx->F || v==fl_ctx->T || v==fl_ctx->NIL ||
-            v == fl_ctx->FL_EOF);
+        return (cv_len((cvalue_t *)ptr(v)) < SMALL_STR_LEN);
+    return (isfixnum(v) || isbuiltin(v) || v == fl_ctx->F || v == fl_ctx->T ||
+            v == fl_ctx->NIL || v == fl_ctx->FL_EOF);
 }
 
 static int smallp(fl_context_t *fl_ctx, value_t v)
 {
-    if (tinyp(fl_ctx, v)) return 1;
-    if (fl_isnumber(fl_ctx, v)) return 1;
+    if (tinyp(fl_ctx, v))
+        return 1;
+    if (fl_isnumber(fl_ctx, v))
+        return 1;
     if (iscons(v)) {
-        if (tinyp(fl_ctx, car_(v)) && (tinyp(fl_ctx, cdr_(v)) ||
-                               (iscons(cdr_(v)) && tinyp(fl_ctx, car_(cdr_(v))) &&
-                                cdr_(cdr_(v))==fl_ctx->NIL)))
+        if (tinyp(fl_ctx, car_(v)) &&
+            (tinyp(fl_ctx, cdr_(v)) || (iscons(cdr_(v)) && tinyp(fl_ctx, car_(cdr_(v))) &&
+                                        cdr_(cdr_(v)) == fl_ctx->NIL)))
             return 1;
         return 0;
     }
     if (isvector(v)) {
         size_t s = vector_size(v);
-        return (s == 0 || (tinyp(fl_ctx, vector_elt(v,0)) &&
-                           (s == 1 || (s == 2 &&
-                                       tinyp(fl_ctx, vector_elt(v,1))))));
+        return (s == 0 || (tinyp(fl_ctx, vector_elt(v, 0)) &&
+                           (s == 1 || (s == 2 && tinyp(fl_ctx, vector_elt(v, 1))))));
     }
     return 0;
 }
@@ -252,12 +251,12 @@ static void print_pair(fl_context_t *fl_ctx, ios_t *f, value_t v)
     value_t cd;
     char *op = NULL;
     if (iscons(cdr_(v)) && cdr_(cdr_(v)) == fl_ctx->NIL &&
-        !ptrhash_has(&fl_ctx->printconses, (void*)cdr_(v)) &&
-        (((car_(v) == fl_ctx->QUOTE)     && (op = "'"))  ||
-         ((car_(v) == fl_ctx->BACKQUOTE) && (op = "`"))  ||
-         ((car_(v) == fl_ctx->COMMA)     && (op = ","))  ||
-         ((car_(v) == fl_ctx->COMMAAT)   && (op = ",@")) ||
-         ((car_(v) == fl_ctx->COMMADOT)  && (op = ",.")))) {
+        !ptrhash_has(&fl_ctx->printconses, (void *)cdr_(v)) &&
+        (((car_(v) == fl_ctx->QUOTE) && (op = "'")) ||
+         ((car_(v) == fl_ctx->BACKQUOTE) && (op = "`")) ||
+         ((car_(v) == fl_ctx->COMMA) && (op = ",")) ||
+         ((car_(v) == fl_ctx->COMMAAT) && (op = ",@")) ||
+         ((car_(v) == fl_ctx->COMMADOT) && (op = ",.")))) {
         // special prefix syntax
         unmark_cons(fl_ctx, v);
         unmark_cons(fl_ctx, cdr_(v));
@@ -267,23 +266,24 @@ static void print_pair(fl_context_t *fl_ctx, ios_t *f, value_t v)
     }
     int startpos = fl_ctx->HPOS;
     outc(fl_ctx, '(', f);
-    int newindent=fl_ctx->HPOS, blk=blockindent(fl_ctx, v);
-    int lastv, n=0, si, ind=0, est, always=0, nextsmall, thistiny;
-    if (!blk) always = indentevery(fl_ctx, v);
+    int newindent = fl_ctx->HPOS, blk = blockindent(fl_ctx, v);
+    int lastv, n = 0, si, ind = 0, est, always = 0, nextsmall, thistiny;
+    if (!blk)
+        always = indentevery(fl_ctx, v);
     value_t head = car_(v);
     int after3 = indentafter3(fl_ctx, head, v);
     int after2 = indentafter2(fl_ctx, head, v);
     int n_unindented = 1;
     while (1) {
         cd = cdr_(v);
-        if (fl_ctx->print_length >= 0 && n >= fl_ctx->print_length && cd!=fl_ctx->NIL) {
+        if (fl_ctx->print_length >= 0 && n >= fl_ctx->print_length && cd != fl_ctx->NIL) {
             outsn(fl_ctx, "...)", f, 4);
             break;
         }
         lastv = fl_ctx->VPOS;
         unmark_cons(fl_ctx, v);
         fl_print_child(fl_ctx, f, car_(v));
-        if (!iscons(cd) || ptrhash_has(&fl_ctx->printconses, (void*)cd)) {
+        if (!iscons(cd) || ptrhash_has(&fl_ctx->printconses, (void *)cd)) {
             if (cd != fl_ctx->NIL) {
                 outsn(fl_ctx, " . ", f, 3);
                 fl_print_child(fl_ctx, f, cd);
@@ -292,8 +292,7 @@ static void print_pair(fl_context_t *fl_ctx, ios_t *f, value_t v)
             break;
         }
 
-        if (!fl_ctx->print_pretty ||
-            ((head == fl_ctx->LAMBDA) && n == 0)) {
+        if (!fl_ctx->print_pretty || ((head == fl_ctx->LAMBDA) && n == 0)) {
             // never break line before lambda-list
             ind = 0;
         }
@@ -301,19 +300,18 @@ static void print_pair(fl_context_t *fl_ctx, ios_t *f, value_t v)
             est = lengthestimate(fl_ctx, car_(cd));
             nextsmall = smallp(fl_ctx, car_(cd));
             thistiny = tinyp(fl_ctx, car_(v));
-            ind = (((fl_ctx->VPOS > lastv) ||
-                    (fl_ctx->HPOS>fl_ctx->SCR_WIDTH/2 && !nextsmall && !thistiny && n>0)) ||
+            ind = (((fl_ctx->VPOS > lastv) || (fl_ctx->HPOS > fl_ctx->SCR_WIDTH / 2 &&
+                                               !nextsmall && !thistiny && n > 0)) ||
 
-                   (fl_ctx->HPOS > fl_ctx->SCR_WIDTH-4) ||
+                   (fl_ctx->HPOS > fl_ctx->SCR_WIDTH - 4) ||
 
-                   (est!=-1 && (fl_ctx->HPOS+est > fl_ctx->SCR_WIDTH-2)) ||
+                   (est != -1 && (fl_ctx->HPOS + est > fl_ctx->SCR_WIDTH - 2)) ||
 
                    ((head == fl_ctx->LAMBDA) && !nextsmall) ||
 
                    (n > 0 && always) ||
 
-                   (n == 2 && after3) ||
-                   (n == 1 && after2) ||
+                   (n == 2 && after3) || (n == 1 && after2) ||
 
                    (n_unindented >= 3 && !nextsmall) ||
 
@@ -327,7 +325,7 @@ static void print_pair(fl_context_t *fl_ctx, ios_t *f, value_t v)
         else {
             n_unindented++;
             outc(fl_ctx, ' ', f);
-            if (n==0) {
+            if (n == 0) {
                 // set indent level after printing head
                 si = specialindent(fl_ctx, head);
                 if (si != -1)
@@ -348,19 +346,19 @@ static int print_circle_prefix(fl_context_t *fl_ctx, ios_t *f, value_t v)
     value_t label;
     char buf[64];
     char *str;
-    if ((label=(value_t)ptrhash_get(&fl_ctx->printconses, (void*)v)) !=
+    if ((label = (value_t)ptrhash_get(&fl_ctx->printconses, (void *)v)) !=
         (value_t)HT_NOTFOUND) {
         if (!ismarked(fl_ctx, v)) {
-            //fl_ctx->HPOS+=ios_printf(f, "#%ld#", numval(label));
+            // fl_ctx->HPOS+=ios_printf(f, "#%ld#", numval(label));
             outc(fl_ctx, '#', f);
-            str = uint2str(buf, sizeof(buf)-1, numval(label), 10);
+            str = uint2str(buf, sizeof(buf) - 1, numval(label), 10);
             outs(fl_ctx, str, f);
             outc(fl_ctx, '#', f);
             return 1;
         }
-        //fl_ctx->HPOS+=ios_printf(f, "#%ld=", numval(label));
+        // fl_ctx->HPOS+=ios_printf(f, "#%ld=", numval(label));
         outc(fl_ctx, '#', f);
-        str = uint2str(buf, sizeof(buf)-1, numval(label), 10);
+        str = uint2str(buf, sizeof(buf) - 1, numval(label), 10);
         outs(fl_ctx, str, f);
         outc(fl_ctx, '=', f);
     }
@@ -381,10 +379,10 @@ void fl_print_child(fl_context_t *fl_ctx, ios_t *f, value_t v)
     fl_ctx->P_LEVEL++;
 
     switch (tag(v)) {
-    case TAG_NUM :
-    case TAG_NUM1: //fl_ctx->HPOS+=ios_printf(f, "%ld", numval(v)); break;
-        str = uint2str(&buf[1], sizeof(buf)-1, labs(numval(v)), 10);
-        if (numval(v)<0)
+    case TAG_NUM:
+    case TAG_NUM1: // fl_ctx->HPOS+=ios_printf(f, "%ld", numval(v)); break;
+        str = uint2str(&buf[1], sizeof(buf) - 1, labs(numval(v)), 10);
+        if (numval(v) < 0)
             *(--str) = '-';
         outs(fl_ctx, str, f);
         break;
@@ -420,14 +418,17 @@ void fl_print_child(fl_context_t *fl_ctx, ios_t *f, value_t v)
         else {
             assert(isclosure(v));
             if (!fl_ctx->print_princ) {
-                if (print_circle_prefix(fl_ctx, f, v)) break;
-                function_t *fn = (function_t*)ptr(v);
+                if (print_circle_prefix(fl_ctx, f, v))
+                    break;
+                function_t *fn = (function_t *)ptr(v);
                 outs(fl_ctx, "#fn(", f);
-                char *data = (char*)cvalue_data(fn->bcode);
+                char *data = (char *)cvalue_data(fn->bcode);
                 size_t i, sz = cvalue_len(fn->bcode);
-                for(i=0; i < sz; i++) data[i] += 48;
+                for (i = 0; i < sz; i++)
+                    data[i] += 48;
                 fl_print_child(fl_ctx, f, fn->bcode);
-                for(i=0; i < sz; i++) data[i] -= 48;
+                for (i = 0; i < sz; i++)
+                    data[i] -= 48;
                 outc(fl_ctx, ' ', f);
                 fl_print_child(fl_ctx, f, fn->vals);
                 if (fn->env != fl_ctx->NIL) {
@@ -447,32 +448,36 @@ void fl_print_child(fl_context_t *fl_ctx, ios_t *f, value_t v)
         break;
     case TAG_CVALUE:
     case TAG_CPRIM:
-        if (v == UNBOUND) { outs(fl_ctx, "#<undefined>", f); break; }
+        if (v == UNBOUND) {
+            outs(fl_ctx, "#<undefined>", f);
+            break;
+        }
         JL_FALLTHROUGH;
     case TAG_VECTOR:
     case TAG_CONS:
-        if (print_circle_prefix(fl_ctx, f, v)) break;
+        if (print_circle_prefix(fl_ctx, f, v))
+            break;
         if (isvector(v)) {
             outc(fl_ctx, '[', f);
             int newindent = fl_ctx->HPOS, est;
             int i, sz = vector_size(v);
-            for(i=0; i < sz; i++) {
-                if (fl_ctx->print_length >= 0 && i >= fl_ctx->print_length && i < sz-1) {
+            for (i = 0; i < sz; i++) {
+                if (fl_ctx->print_length >= 0 && i >= fl_ctx->print_length && i < sz - 1) {
                     outsn(fl_ctx, "...", f, 3);
                     break;
                 }
-                fl_print_child(fl_ctx, f, vector_elt(v,i));
-                if (i < sz-1) {
+                fl_print_child(fl_ctx, f, vector_elt(v, i));
+                if (i < sz - 1) {
                     if (!fl_ctx->print_pretty) {
                         outc(fl_ctx, ' ', f);
                     }
                     else {
-                        est = lengthestimate(fl_ctx, vector_elt(v,i+1));
-                        if (fl_ctx->HPOS > fl_ctx->SCR_WIDTH-4 ||
-                            (est!=-1 && (fl_ctx->HPOS+est > fl_ctx->SCR_WIDTH-2)) ||
-                            (fl_ctx->HPOS > fl_ctx->SCR_WIDTH/2 &&
-                             !smallp(fl_ctx, vector_elt(v,i+1)) &&
-                             !tinyp(fl_ctx, vector_elt(v,i))))
+                        est = lengthestimate(fl_ctx, vector_elt(v, i + 1));
+                        if (fl_ctx->HPOS > fl_ctx->SCR_WIDTH - 4 ||
+                            (est != -1 && (fl_ctx->HPOS + est > fl_ctx->SCR_WIDTH - 2)) ||
+                            (fl_ctx->HPOS > fl_ctx->SCR_WIDTH / 2 &&
+                             !smallp(fl_ctx, vector_elt(v, i + 1)) &&
+                             !tinyp(fl_ctx, vector_elt(v, i))))
                             newindent = outindent(fl_ctx, newindent, f);
                         else
                             outc(fl_ctx, ' ', f);
@@ -501,7 +506,7 @@ static void print_string(fl_context_t *fl_ctx, ios_t *f, char *str, size_t sz)
     outc(fl_ctx, '"', f);
     if (!u8_isvalid(str, sz)) {
         // alternate print algorithm that preserves data if it's not UTF-8
-        for(i=0; i < sz; i++) {
+        for (i = 0; i < sz; i++) {
             c = str[i];
             if (c == '\\')
                 outsn(fl_ctx, "\\\\", f, 2);
@@ -511,15 +516,15 @@ static void print_string(fl_context_t *fl_ctx, ios_t *f, char *str, size_t sz)
                 outc(fl_ctx, c, f);
             else {
                 outsn(fl_ctx, "\\x", f, 2);
-                outc(fl_ctx, hexdig[c>>4], f);
-                outc(fl_ctx, hexdig[c&0xf], f);
+                outc(fl_ctx, hexdig[c >> 4], f);
+                outc(fl_ctx, hexdig[c & 0xf], f);
             }
         }
     }
     else {
         while (i < sz) {
             size_t n = u8_escape(buf, sizeof(buf), str, &i, sz, 1, 0);
-            outsn(fl_ctx, buf, f, n-1);
+            outsn(fl_ctx, buf, f, n - 1);
         }
     }
     outc(fl_ctx, '"', f);
@@ -532,27 +537,27 @@ static numerictype_t sym_to_numtype(fl_context_t *fl_ctx, value_t type);
 #undef __USE_GNU
 #endif
 
-#define sign_bit(r) ((*(int64_t*)&(r)) & BIT63)
-#define DFINITE(d) (((*(int64_t*)&(d))&0x7ff0000000000000LL)!=0x7ff0000000000000LL)
+#define sign_bit(r) ((*(int64_t *)&(r)) & BIT63)
+#define DFINITE(d) (((*(int64_t *)&(d)) & 0x7ff0000000000000LL) != 0x7ff0000000000000LL)
 
 // 'weak' means we don't need to accurately reproduce the type, so
 // for example #int32(0) can be printed as just 0. this is used
 // printing in a context where a type is already implied, e.g. inside
 // an array.
-static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
-                             size_t len, value_t type, int weak)
+static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data, size_t len,
+                             value_t type, int weak)
 {
     if (type == fl_ctx->bytesym) {
-        unsigned char ch = *(unsigned char*)data;
+        unsigned char ch = *(unsigned char *)data;
         if (fl_ctx->print_princ)
             outc(fl_ctx, ch, f);
         else if (weak)
-            fl_ctx->HPOS+=ios_printf(f, "0x%hhx", ch);
+            fl_ctx->HPOS += ios_printf(f, "0x%hhx", ch);
         else
-            fl_ctx->HPOS+=ios_printf(f, "#byte(0x%hhx)", ch);
+            fl_ctx->HPOS += ios_printf(f, "#byte(0x%hhx)", ch);
     }
     else if (type == fl_ctx->wcharsym) {
-        uint32_t wc = *(uint32_t*)data;
+        uint32_t wc = *(uint32_t *)data;
         char seq[8];
         size_t nb = u8_toutf8(seq, sizeof(seq), &wc, 1);
         seq[nb] = '\0';
@@ -562,35 +567,52 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
         }
         else {
             outsn(fl_ctx, "#\\", f, 2);
-            if      (wc == 0x00) outsn(fl_ctx, "nul", f, 3);
-            else if (wc == 0x07) outsn(fl_ctx, "alarm", f, 5);
-            else if (wc == 0x08) outsn(fl_ctx, "backspace", f, 9);
-            else if (wc == 0x09) outsn(fl_ctx, "tab", f, 3);
-            else if (wc == 0x0A) outsn(fl_ctx, "linefeed", f, 8);
-            //else if (wc == 0x0A) outsn(fl_ctx, "newline", f, 7);
-            else if (wc == 0x0B) outsn(fl_ctx, "vtab", f, 4);
-            else if (wc == 0x0C) outsn(fl_ctx, "page", f, 4);
-            else if (wc == 0x0D) outsn(fl_ctx, "return", f, 6);
-            else if (wc == 0x1B) outsn(fl_ctx, "esc", f, 3);
-            else if (wc == 0x20) outsn(fl_ctx, "space", f, 5);
-            else if (wc == 0x7F) outsn(fl_ctx, "delete", f, 6);
-            else if (iswprint(wc)) outs(fl_ctx, seq, f);
-            else fl_ctx->HPOS+=ios_printf(f, "x%04x", (int)wc);
+            if (wc == 0x00)
+                outsn(fl_ctx, "nul", f, 3);
+            else if (wc == 0x07)
+                outsn(fl_ctx, "alarm", f, 5);
+            else if (wc == 0x08)
+                outsn(fl_ctx, "backspace", f, 9);
+            else if (wc == 0x09)
+                outsn(fl_ctx, "tab", f, 3);
+            else if (wc == 0x0A)
+                outsn(fl_ctx, "linefeed", f, 8);
+            // else if (wc == 0x0A) outsn(fl_ctx, "newline", f, 7);
+            else if (wc == 0x0B)
+                outsn(fl_ctx, "vtab", f, 4);
+            else if (wc == 0x0C)
+                outsn(fl_ctx, "page", f, 4);
+            else if (wc == 0x0D)
+                outsn(fl_ctx, "return", f, 6);
+            else if (wc == 0x1B)
+                outsn(fl_ctx, "esc", f, 3);
+            else if (wc == 0x20)
+                outsn(fl_ctx, "space", f, 5);
+            else if (wc == 0x7F)
+                outsn(fl_ctx, "delete", f, 6);
+            else if (iswprint(wc))
+                outs(fl_ctx, seq, f);
+            else
+                fl_ctx->HPOS += ios_printf(f, "x%04x", (int)wc);
         }
     }
     else if (type == fl_ctx->floatsym || type == fl_ctx->doublesym) {
         char buf[64];
         double d;
-        if (type == fl_ctx->floatsym) { d = (double)*(float*)data; }
-        else { d = *(double*)data; }
+        if (type == fl_ctx->floatsym) {
+            d = (double)*(float *)data;
+        }
+        else {
+            d = *(double *)data;
+        }
         if (!DFINITE(d)) {
             char *rep;
             if (d != d)
-                rep = (char*)(sign_bit(d) ? "-nan.0" : "+nan.0");
+                rep = (char *)(sign_bit(d) ? "-nan.0" : "+nan.0");
             else
-                rep = (char*)(sign_bit(d) ? "-inf.0" : "+inf.0");
+                rep = (char *)(sign_bit(d) ? "-inf.0" : "+inf.0");
             if (type == fl_ctx->floatsym && !fl_ctx->print_princ && !weak)
-                fl_ctx->HPOS+=ios_printf(f, "#%s(%s)", symbol_name(fl_ctx, type), rep);
+                fl_ctx->HPOS += ios_printf(f, "#%s(%s)", symbol_name(fl_ctx, type), rep);
             else
                 outs(fl_ctx, rep, f);
         }
@@ -615,7 +637,8 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
             }
             int hasdec = (strpbrk(buf, ".eE") != NULL);
             outs(fl_ctx, buf, f);
-            if (!hasdec) outsn(fl_ctx, ".0", f, 2);
+            if (!hasdec)
+                outsn(fl_ctx, ".0", f, 2);
             if (type == fl_ctx->floatsym && !fl_ctx->print_princ && !weak)
                 outc(fl_ctx, 'f', f);
         }
@@ -624,8 +647,8 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
 #ifdef _P64
              || type == fl_ctx->sizesym
 #endif
-             ) {
-        uint64_t ui64 = *(uint64_t*)data;
+    ) {
+        uint64_t ui64 = *(uint64_t *)data;
         if (weak || fl_ctx->print_princ)
             fl_ctx->HPOS += ios_printf(f, "%llu", ui64);
         else
@@ -637,30 +660,29 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
         numerictype_t nt = sym_to_numtype(fl_ctx, type);
         if (nt == N_NUMTYPES) {
             // These states should be context independent.
-            static size_t (*volatile jl_static_print)(ios_t*, void*) = NULL;
+            static size_t (*volatile jl_static_print)(ios_t *, void *) = NULL;
             static volatile int init = 0;
             if (init == 0) {
 #if defined(RTLD_SELF)
-                jl_static_print = (size_t (*)(ios_t*, void*))
-                    (uintptr_t)dlsym(RTLD_SELF, "jl_static_show");
+                jl_static_print = (size_t(*)(ios_t *, void *))(
+                    uintptr_t)dlsym(RTLD_SELF, "jl_static_show");
 #elif defined(RTLD_DEFAULT)
-                jl_static_print = (size_t (*)(ios_t*, void*))
-                    (uintptr_t)dlsym(RTLD_DEFAULT, "jl_static_show");
+                jl_static_print = (size_t(*)(ios_t *, void *))(
+                    uintptr_t)dlsym(RTLD_DEFAULT, "jl_static_show");
 #elif defined(_OS_WINDOWS_)
                 HMODULE handle;
                 if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                                       GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                                       (LPCWSTR)(&cvalue_printdata),
-                                       &handle)) {
-                    jl_static_print = (size_t (*)(ios_t*, void*))
-                        (uintptr_t)GetProcAddress(handle, "jl_static_show");
+                                           GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                       (LPCWSTR)(&cvalue_printdata), &handle)) {
+                    jl_static_print = (size_t(*)(ios_t *, void *))(
+                        uintptr_t)GetProcAddress(handle, "jl_static_show");
                 }
 #endif
                 init = 1;
             }
             if (jl_static_print != NULL && fl_ctx->jl_sym == type) {
                 fl_ctx->HPOS += ios_printf(f, "#<julia: ");
-                fl_ctx->HPOS += jl_static_print(f, *(void**)data);
+                fl_ctx->HPOS += jl_static_print(f, *(void **)data);
                 fl_ctx->HPOS += ios_printf(f, ">");
             }
             else
@@ -680,17 +702,17 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
             size_t cnt, elsize;
             if (iscons(cdr_(cdr_(type)))) {
                 cnt = tosize(fl_ctx, car_(cdr_(cdr_(type))), "length");
-                elsize = cnt ? len/cnt : 0;
+                elsize = cnt ? len / cnt : 0;
             }
             else {
                 // incomplete array type
                 int junk;
                 elsize = ctype_sizeof(fl_ctx, eltype, &junk);
-                cnt = elsize ? len/elsize : 0;
+                cnt = elsize ? len / elsize : 0;
             }
             if (eltype == fl_ctx->bytesym) {
                 if (fl_ctx->print_princ) {
-                    ios_write(f, (char*)data, len);
+                    ios_write(f, (char *)data, len);
                     /*
                     char *nl = memrchr(data, '\n', len);
                     if (nl)
@@ -700,7 +722,7 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
                     */
                 }
                 else {
-                    print_string(fl_ctx, f, (char*)data, len);
+                    print_string(fl_ctx, f, (char *)data, len);
                 }
                 return;
             }
@@ -724,7 +746,7 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
             else {
                 outc(fl_ctx, '[', f);
             }
-            for(i=0; i < cnt; i++) {
+            for (i = 0; i < cnt; i++) {
                 if (i > 0)
                     outc(fl_ctx, ' ', f);
                 cvalue_printdata(fl_ctx, f, data, elsize, eltype, 1);
@@ -740,12 +762,12 @@ static void cvalue_printdata(fl_context_t *fl_ctx, ios_t *f, void *data,
 
 static void cvalue_print(fl_context_t *fl_ctx, ios_t *f, value_t v)
 {
-    cvalue_t *cv = (cvalue_t*)ptr(v);
+    cvalue_t *cv = (cvalue_t *)ptr(v);
     void *data = cptr(v);
     value_t label;
 
     if (cv_class(cv) == fl_ctx->builtintype) {
-        void *fptr = *(void**)data;
+        void *fptr = *(void **)data;
         label = (value_t)ptrhash_get(&fl_ctx->reverse_dlsym_lookup_table, cv);
         if (label == (value_t)HT_NOTFOUND) {
             fl_ctx->HPOS += ios_printf(f, "#<builtin @0x%08zx>", (size_t)fptr);
@@ -761,8 +783,7 @@ static void cvalue_print(fl_context_t *fl_ctx, ios_t *f, value_t v)
             }
         }
     }
-    else if (cv_class(cv)->vtable != NULL &&
-             cv_class(cv)->vtable->print != NULL) {
+    else if (cv_class(cv)->vtable != NULL && cv_class(cv)->vtable->print != NULL) {
         cv_class(cv)->vtable->print(fl_ctx, v, f);
     }
     else {
@@ -775,7 +796,8 @@ static void cvalue_print(fl_context_t *fl_ctx, ios_t *f, value_t v)
 static void set_print_width(fl_context_t *fl_ctx)
 {
     value_t pw = symbol_value(fl_ctx->printwidthsym);
-    if (!isfixnum(pw)) return;
+    if (!isfixnum(pw))
+        return;
     fl_ctx->SCR_WIDTH = numval(pw);
 }
 
@@ -787,11 +809,15 @@ void fl_print(fl_context_t *fl_ctx, ios_t *f, value_t v)
     fl_ctx->print_princ = (symbol_value(fl_ctx->printreadablysym) == fl_ctx->F);
 
     value_t pl = symbol_value(fl_ctx->printlengthsym);
-    if (isfixnum(pl)) fl_ctx->print_length = numval(pl);
-    else fl_ctx->print_length = -1;
+    if (isfixnum(pl))
+        fl_ctx->print_length = numval(pl);
+    else
+        fl_ctx->print_length = -1;
     pl = symbol_value(fl_ctx->printlevelsym);
-    if (isfixnum(pl)) fl_ctx->print_level = numval(pl);
-    else fl_ctx->print_level = -1;
+    if (isfixnum(pl))
+        fl_ctx->print_level = numval(pl);
+    else
+        fl_ctx->print_level = -1;
     fl_ctx->P_LEVEL = 0;
 
     fl_ctx->printlabel = 0;
@@ -801,11 +827,12 @@ void fl_print(fl_context_t *fl_ctx, ios_t *f, value_t v)
     fl_print_child(fl_ctx, f, v);
 
     if (fl_ctx->print_level >= 0 || fl_ctx->print_length >= 0) {
-        memset(fl_ctx->consflags, 0, 4*bitvector_nwords(fl_ctx->heapsize/sizeof(cons_t)));
+        memset(fl_ctx->consflags, 0,
+               4 * bitvector_nwords(fl_ctx->heapsize / sizeof(cons_t)));
     }
 
     if ((iscons(v) || isvector(v) || isfunction(v) || iscvalue(v)) &&
-        !fl_isstring(fl_ctx, v) && v!=fl_ctx->T && v!=fl_ctx->F && v!=fl_ctx->NIL) {
+        !fl_isstring(fl_ctx, v) && v != fl_ctx->T && v != fl_ctx->F && v != fl_ctx->NIL) {
         htable_reset(&fl_ctx->printconses, 32);
     }
 }

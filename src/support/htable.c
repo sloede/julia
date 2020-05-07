@@ -4,15 +4,15 @@
   functions common to all hash table instantiations
 */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <assert.h>
 #include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "dtypes.h"
-#include "htable.h"
 #include "hashing.h"
+#include "htable.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,10 +26,10 @@ htable_t *htable_new(htable_t *h, size_t size)
     }
     else {
         size = next_power_of_two(size);
-        size *= 2;  // 2 pointers per key/value pair
-        size *= 2;  // aim for 50% occupancy
+        size *= 2; // 2 pointers per key/value pair
+        size *= 2; // aim for 50% occupancy
         h->size = size;
-        h->table = (void**)LLT_ALLOC(size * sizeof(void*));
+        h->table = (void **)LLT_ALLOC(size * sizeof(void *));
     }
     if (h->table == NULL)
         return NULL;

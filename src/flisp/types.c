@@ -4,15 +4,15 @@ fltype_t *get_type(fl_context_t *fl_ctx, value_t t)
 {
     fltype_t *ft;
     if (issymbol(t)) {
-        ft = ((symbol_t*)ptr(t))->type;
+        ft = ((symbol_t *)ptr(t))->type;
         if (ft != NULL)
             return ft;
     }
-    void **bp = equalhash_bp_r(&fl_ctx->TypeTable, (void*)t, (void*)fl_ctx);
+    void **bp = equalhash_bp_r(&fl_ctx->TypeTable, (void *)t, (void *)fl_ctx);
     if (*bp != HT_NOTFOUND)
-        return (fltype_t*)*bp;
+        return (fltype_t *)*bp;
 
-    int align, isarray=(iscons(t) && car_(t) == fl_ctx->arraysym && iscons(cdr_(t)));
+    int align, isarray = (iscons(t) && car_(t) == fl_ctx->arraysym && iscons(cdr_(t)));
     size_t sz;
     if (isarray && !iscons(cdr_(cdr_(t)))) {
         // special case: incomplete array type
@@ -22,12 +22,12 @@ fltype_t *get_type(fl_context_t *fl_ctx, value_t t)
         sz = ctype_sizeof(fl_ctx, t, &align);
     }
 
-    ft = (fltype_t*)malloc(sizeof(fltype_t));
+    ft = (fltype_t *)malloc(sizeof(fltype_t));
     // TODO: if ft == NULL
     ft->type = t;
     if (issymbol(t)) {
         ft->numtype = sym_to_numtype(fl_ctx, t);
-        ((symbol_t*)ptr(t))->type = ft;
+        ((symbol_t *)ptr(t))->type = ft;
     }
     else {
         ft->numtype = (numerictype_t)N_NUMTYPES;
@@ -67,7 +67,7 @@ fltype_t *get_array_type(fl_context_t *fl_ctx, value_t eltype)
 fltype_t *define_opaque_type(value_t sym, size_t sz, const cvtable_t *vtab,
                              cvinitfunc_t init)
 {
-    fltype_t *ft = (fltype_t*)malloc(sizeof(fltype_t));
+    fltype_t *ft = (fltype_t *)malloc(sizeof(fltype_t));
     ft->type = sym;
     ft->size = sz;
     ft->numtype = (numerictype_t)N_NUMTYPES;
@@ -85,12 +85,12 @@ void relocate_typetable(fl_context_t *fl_ctx)
     htable_t *h = &fl_ctx->TypeTable;
     size_t i;
     void *nv;
-    for(i=0; i < h->size; i+=2) {
+    for (i = 0; i < h->size; i += 2) {
         if (h->table[i] != HT_NOTFOUND) {
-            nv = (void*)relocate(fl_ctx, (value_t)h->table[i]);
+            nv = (void *)relocate(fl_ctx, (value_t)h->table[i]);
             h->table[i] = nv;
-            if (h->table[i+1] != HT_NOTFOUND)
-                ((fltype_t*)h->table[i+1])->type = (value_t)nv;
+            if (h->table[i + 1] != HT_NOTFOUND)
+                ((fltype_t *)h->table[i + 1])->type = (value_t)nv;
         }
     }
 }

@@ -2,11 +2,11 @@
 
 #include "llvm-version.h"
 
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/IntrinsicInst.h>
-#include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Module.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
@@ -28,10 +28,9 @@ using namespace llvm;
 // This pass targets typical back-ends for which the standard Julia
 // runtime library is available. Atypical back-ends should supply
 // their own lowering pass.
-struct FinalLowerGC: public FunctionPass, private JuliaPassContext {
+struct FinalLowerGC : public FunctionPass, private JuliaPassContext {
     static char ID;
-    FinalLowerGC() : FunctionPass(ID)
-    { }
+    FinalLowerGC() : FunctionPass(ID) {}
 
 private:
     Function *queueRootFunc;
@@ -70,24 +69,23 @@ Value *FinalLowerGC::lowerNewGCFrame(CallInst *target, Function &F)
     unsigned nRoots = cast<ConstantInt>(target->getArgOperand(0))->getLimitedValue(INT_MAX);
 
     // Create the GC frame.
-    AllocaInst *gcframe = new AllocaInst(
-        T_prjlvalue,
-        0,
-        ConstantInt::get(T_int32, nRoots + 2));
+    AllocaInst *gcframe =
+        new AllocaInst(T_prjlvalue, 0, ConstantInt::get(T_int32, nRoots + 2));
     gcframe->setAlignment(Align(16));
     gcframe->insertAfter(target);
     gcframe->takeName(target);
 
     // Zero out the GC frame.
-    BitCastInst *tempSlot_i8 = new BitCastInst(gcframe, Type::getInt8PtrTy(F.getContext()), "");
+    BitCastInst *tempSlot_i8 =
+        new BitCastInst(gcframe, Type::getInt8PtrTy(F.getContext()), "");
     tempSlot_i8->insertAfter(gcframe);
     Type *argsT[2] = {tempSlot_i8->getType(), T_int32};
-    Function *memset = Intrinsic::getDeclaration(F.getParent(), Intrinsic::memset, makeArrayRef(argsT));
-    Value *args[4] = {
-        tempSlot_i8, // dest
-        ConstantInt::get(Type::getInt8Ty(F.getContext()), 0), // val
-        ConstantInt::get(T_int32, sizeof(jl_value_t*) * (nRoots + 2)), // len
-        ConstantInt::get(Type::getInt1Ty(F.getContext()), 0)}; // volatile
+    Function *memset =
+        Intrinsic::getDeclaration(F.getParent(), Intrinsic::memset, makeArrayRef(argsT));
+    Value *args[4] = {tempSlot_i8, // dest
+                      ConstantInt::get(Type::getInt8Ty(F.getContext()), 0), // val
+                      ConstantInt::get(T_int32, sizeof(jl_value_t *) * (nRoots + 2)), // len
+                      ConstantInt::get(Type::getInt1Ty(F.getContext()), 0)}; // volatile
     CallInst *zeroing = CallInst::Create(memset, makeArrayRef(args));
     cast<MemSetInst>(zeroing)->setDestAlignment(16);
     zeroing->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
@@ -105,21 +103,19 @@ void FinalLowerGC::lowerPushGCFrame(CallInst *target, Function &F)
     IRBuilder<> builder(target->getContext());
     builder.SetInsertPoint(&*(++BasicBlock::iterator(target)));
     Instruction *inst =
-        builder.CreateStore(
-            ConstantInt::get(T_size, JL_GC_ENCODE_PUSHARGS(nRoots)),
-            builder.CreateBitCast(
-                builder.CreateConstGEP1_32(gcframe, 0),
-                T_size->getPointerTo()));
+        builder.CreateStore(ConstantInt::get(T_size, JL_GC_ENCODE_PUSHARGS(nRoots)),
+                            builder.CreateBitCast(builder.CreateConstGEP1_32(gcframe, 0),
+                                                  T_size->getPointerTo()));
     inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
     Value *pgcstack = builder.Insert(getPgcstack(ptlsStates));
     inst = builder.CreateStore(
         builder.CreateLoad(pgcstack),
-        builder.CreatePointerCast(
-            builder.CreateConstGEP1_32(gcframe, 1),
-            PointerType::get(T_ppjlvalue, 0)));
+        builder.CreatePointerCast(builder.CreateConstGEP1_32(gcframe, 1),
+                                  PointerType::get(T_ppjlvalue, 0)));
     inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
-    builder.CreateStore(gcframe, builder.CreateBitCast(pgcstack,
-        PointerType::get(PointerType::get(T_prjlvalue, 0), 0)));
+    builder.CreateStore(
+        gcframe, builder.CreateBitCast(
+                     pgcstack, PointerType::get(PointerType::get(T_prjlvalue, 0), 0)));
 }
 
 void FinalLowerGC::lowerPopGCFrame(CallInst *target, Function &F)
@@ -129,15 +125,12 @@ void FinalLowerGC::lowerPopGCFrame(CallInst *target, Function &F)
 
     IRBuilder<> builder(target->getContext());
     builder.SetInsertPoint(target);
-    Instruction *gcpop =
-        cast<Instruction>(builder.CreateConstGEP1_32(gcframe, 1));
+    Instruction *gcpop = cast<Instruction>(builder.CreateConstGEP1_32(gcframe, 1));
     Instruction *inst = builder.CreateLoad(gcpop);
     inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
     inst = builder.CreateStore(
-        inst,
-        builder.CreateBitCast(
-            builder.Insert(getPgcstack(ptlsStates)),
-            PointerType::get(T_prjlvalue, 0)));
+        inst, builder.CreateBitCast(builder.Insert(getPgcstack(ptlsStates)),
+                                    PointerType::get(T_prjlvalue, 0)));
     inst->setMetadata(LLVMContext::MD_tbaa, tbaa_gcframe);
 }
 
@@ -169,12 +162,10 @@ Value *FinalLowerGC::lowerQueueGCRoot(CallInst *target, Function &F)
 
 Instruction *FinalLowerGC::getPgcstack(Instruction *ptlsStates)
 {
-    Constant *offset = ConstantInt::getSigned(T_int32, offsetof(jl_tls_states_t, pgcstack) / sizeof(void*));
-    return GetElementPtrInst::Create(
-        nullptr,
-        ptlsStates,
-        ArrayRef<Value*>(offset),
-        "jl_pgcstack");
+    Constant *offset = ConstantInt::getSigned(T_int32, offsetof(jl_tls_states_t, pgcstack) /
+                                                           sizeof(void *));
+    return GetElementPtrInst::Create(nullptr, ptlsStates, ArrayRef<Value *>(offset),
+                                     "jl_pgcstack");
 }
 
 Value *FinalLowerGC::lowerGCAllocBytes(CallInst *target, Function &F)
@@ -189,21 +180,21 @@ Value *FinalLowerGC::lowerGCAllocBytes(CallInst *target, Function &F)
     auto ptls = target->getArgOperand(0);
     CallInst *newI;
     if (offset < 0) {
-        newI = builder.CreateCall(
-            bigAllocFunc,
-            { ptls, ConstantInt::get(T_size, sz + sizeof(void*)) });
+        newI = builder.CreateCall(bigAllocFunc,
+                                  {ptls, ConstantInt::get(T_size, sz + sizeof(void *))});
     }
     else {
         auto pool_offs = ConstantInt::get(T_int32, offset);
         auto pool_osize = ConstantInt::get(T_int32, osize);
-        newI = builder.CreateCall(poolAllocFunc, { ptls, pool_offs, pool_osize });
+        newI = builder.CreateCall(poolAllocFunc, {ptls, pool_offs, pool_osize});
     }
     newI->setAttributes(newI->getCalledFunction()->getAttributes());
     newI->takeName(target);
     return newI;
 }
 
-bool FinalLowerGC::doInitialization(Module &M) {
+bool FinalLowerGC::doInitialization(Module &M)
+{
     // Initialize platform-agnostic references.
     initAll(M);
 
@@ -214,7 +205,7 @@ bool FinalLowerGC::doInitialization(Module &M) {
 
     GlobalValue *functionList[] = {queueRootFunc, poolAllocFunc, bigAllocFunc};
     unsigned j = 0;
-    for (unsigned i = 0; i < sizeof(functionList) / sizeof(void*); i++) {
+    for (unsigned i = 0; i < sizeof(functionList) / sizeof(void *); i++) {
         if (!functionList[i])
             continue;
         if (i != j)
@@ -222,7 +213,7 @@ bool FinalLowerGC::doInitialization(Module &M) {
         j++;
     }
     if (j != 0)
-        appendToCompilerUsed(M, ArrayRef<GlobalValue*>(functionList, j));
+        appendToCompilerUsed(M, ArrayRef<GlobalValue *>(functionList, j));
     return true;
 }
 
@@ -232,11 +223,10 @@ bool FinalLowerGC::doFinalization(Module &M)
     if (!used)
         return false;
     GlobalValue *functionList[] = {queueRootFunc, poolAllocFunc, bigAllocFunc};
-    SmallPtrSet<Constant*, 16> InitAsSet(
-        functionList,
-        functionList + sizeof(functionList) / sizeof(void*));
+    SmallPtrSet<Constant *, 16> InitAsSet(
+        functionList, functionList + sizeof(functionList) / sizeof(void *));
     bool changed = false;
-    SmallVector<Constant*, 16> init;
+    SmallVector<Constant *, 16> init;
     ConstantArray *CA = dyn_cast<ConstantArray>(used->getInitializer());
     for (auto &Op : CA->operands()) {
         Constant *C = cast_or_null<Constant>(Op);
@@ -253,16 +243,14 @@ bool FinalLowerGC::doFinalization(Module &M)
         return true;
     ArrayType *ATy = ArrayType::get(T_pint8, init.size());
     used = new GlobalVariable(M, ATy, false, GlobalValue::AppendingLinkage,
-                                    ConstantArray::get(ATy, init), "llvm.compiler.used");
+                              ConstantArray::get(ATy, init), "llvm.compiler.used");
     used->setSection("llvm.metadata");
     return true;
 }
 
 template<typename TIterator>
-static void replaceInstruction(
-    Instruction *oldInstruction,
-    Value *newInstruction,
-    TIterator &it)
+static void replaceInstruction(Instruction *oldInstruction, Value *newInstruction,
+                               TIterator &it)
 {
     if (newInstruction != oldInstruction) {
         oldInstruction->replaceAllUsesWith(newInstruction);
@@ -335,7 +323,8 @@ bool FinalLowerGC::runOnFunction(Function &F)
 }
 
 char FinalLowerGC::ID = 0;
-static RegisterPass<FinalLowerGC> X("FinalLowerGC", "Final GC intrinsic lowering pass", false, false);
+static RegisterPass<FinalLowerGC> X("FinalLowerGC", "Final GC intrinsic lowering pass",
+                                    false, false);
 
 Pass *createFinalLowerGCPass()
 {

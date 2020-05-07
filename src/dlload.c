@@ -5,15 +5,15 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "platform.h"
 #include "julia.h"
 #include "julia_internal.h"
+#include "platform.h"
 #ifdef _OS_WINDOWS_
-#include <windows.h>
 #include <direct.h>
+#include <windows.h>
 #else
-#include <unistd.h>
 #include <dlfcn.h>
+#include <unistd.h>
 #endif
 #include "julia_assert.h"
 
@@ -22,14 +22,14 @@ extern "C" {
 #endif
 
 #if defined(__APPLE__)
-static char const *const extensions[] = { "", ".dylib" };
+static char const *const extensions[] = {"", ".dylib"};
 #elif defined(_OS_WINDOWS_)
-static char const *const extensions[] = { "", ".dll" };
+static char const *const extensions[] = {"", ".dll"};
 extern int needsSymRefreshModuleList;
 #else
-static char const *const extensions[] = { "", ".so" };
+static char const *const extensions[] = {"", ".so"};
 #endif
-#define N_EXTENSIONS (sizeof(extensions) / sizeof(char*))
+#define N_EXTENSIONS (sizeof(extensions) / sizeof(char *))
 
 static int endswith_extension(const char *path)
 {
@@ -50,7 +50,8 @@ static int endswith_extension(const char *path)
             else
                 break;
         }
-        if ((j == len-1 || path[j+1] == '.') && memcmp(ext, path + j - extlen + 1, extlen) == 0) {
+        if ((j == len - 1 || path[j + 1] == '.') &&
+            memcmp(ext, path + j - extlen + 1, extlen) == 0) {
             return 1;
         }
     }
@@ -61,28 +62,23 @@ static int endswith_extension(const char *path)
 
 extern char *julia_bindir;
 
-#define JL_RTLD(flags, FLAG) (flags & JL_RTLD_ ## FLAG ? RTLD_ ## FLAG : 0)
+#define JL_RTLD(flags, FLAG) (flags & JL_RTLD_##FLAG ? RTLD_##FLAG : 0)
 
 #ifdef _OS_WINDOWS_
 static void win32_formatmessage(DWORD code, char *reason, int len)
 {
     DWORD res;
     LPWSTR errmsg;
-    res = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                         FORMAT_MESSAGE_FROM_SYSTEM |
-                         FORMAT_MESSAGE_IGNORE_INSERTS |
-                         FORMAT_MESSAGE_MAX_WIDTH_MASK,
-                         NULL, code,
-                         MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
+    res = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                             FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK,
+                         NULL, code, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
                          (LPWSTR)&errmsg, 0, NULL);
     if (!res && (GetLastError() == ERROR_MUI_FILE_NOT_FOUND ||
                  GetLastError() == ERROR_RESOURCE_TYPE_NOT_FOUND)) {
-      res = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                           FORMAT_MESSAGE_FROM_SYSTEM |
-                           FORMAT_MESSAGE_IGNORE_INSERTS |
-                           FORMAT_MESSAGE_MAX_WIDTH_MASK,
-                           NULL, code,
-                           0, (LPWSTR)&errmsg, 0, NULL);
+        res = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                                 FORMAT_MESSAGE_IGNORE_INSERTS |
+                                 FORMAT_MESSAGE_MAX_WIDTH_MASK,
+                             NULL, code, 0, (LPWSTR)&errmsg, 0, NULL);
     }
     res = WideCharToMultiByte(CP_UTF8, 0, errmsg, -1, reason, len, NULL, NULL);
     assert(res > 0 || GetLastError() == ERROR_INSUFFICIENT_BUFFER);
@@ -96,45 +92,48 @@ JL_DLLEXPORT void *jl_dlopen(const char *filename, unsigned flags)
 #if defined(_OS_WINDOWS_)
     needsSymRefreshModuleList = 1;
     size_t len = MultiByteToWideChar(CP_UTF8, 0, filename, -1, NULL, 0);
-    if (!len) return NULL;
-    WCHAR *wfilename = (WCHAR*)alloca(len * sizeof(WCHAR));
-    if (!MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, len)) return NULL;
+    if (!len)
+        return NULL;
+    WCHAR *wfilename = (WCHAR *)alloca(len * sizeof(WCHAR));
+    if (!MultiByteToWideChar(CP_UTF8, 0, filename, -1, wfilename, len))
+        return NULL;
     return LoadLibraryExW(wfilename, NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
 #else
     dlerror(); /* Reset error status. */
-    return dlopen(filename,
-                  (flags & JL_RTLD_NOW ? RTLD_NOW : RTLD_LAZY)
-                  | JL_RTLD(flags, LOCAL)
-                  | JL_RTLD(flags, GLOBAL)
+    return dlopen(filename, (flags & JL_RTLD_NOW ? RTLD_NOW : RTLD_LAZY) |
+                                JL_RTLD(flags, LOCAL) | JL_RTLD(flags, GLOBAL)
 #ifdef RTLD_NODELETE
-                  | JL_RTLD(flags, NODELETE)
+                                | JL_RTLD(flags, NODELETE)
 #endif
 #ifdef RTLD_NOLOAD
-                  | JL_RTLD(flags, NOLOAD)
+                                | JL_RTLD(flags, NOLOAD)
 #endif
 #if defined(RTLD_DEEPBIND) && !defined(JL_ASAN_ENABLED)
-                  | JL_RTLD(flags, DEEPBIND)
+                                | JL_RTLD(flags, DEEPBIND)
 #endif
 #ifdef RTLD_FIRST
-                  | JL_RTLD(flags, FIRST)
+                                | JL_RTLD(flags, FIRST)
 #endif
-                  );
+    );
 #endif
 }
 
 JL_DLLEXPORT int jl_dlclose(void *handle)
 {
 #ifdef _OS_WINDOWS_
-    if (!handle) return -1;
-    return !FreeLibrary((HMODULE) handle);
+    if (!handle)
+        return -1;
+    return !FreeLibrary((HMODULE)handle);
 #else
     dlerror(); /* Reset error status. */
-    if (!handle) return -1;
+    if (!handle)
+        return -1;
     return dlclose(handle);
 #endif
 }
 
-JL_DLLEXPORT void *jl_load_dynamic_library(const char *modname, unsigned flags, int throw_err)
+JL_DLLEXPORT void *jl_load_dynamic_library(const char *modname, unsigned flags,
+                                           int throw_err)
 {
     char path[PATHBUF];
     int i;
@@ -153,14 +152,15 @@ JL_DLLEXPORT void *jl_load_dynamic_library(const char *modname, unsigned flags, 
     */
     if (modname == NULL) {
 #ifdef _OS_WINDOWS_
-        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                                 (LPCWSTR)(uintptr_t)(&jl_load_dynamic_library),
-                                (HMODULE*)&handle)) {
+                                (HMODULE *)&handle)) {
             jl_error("could not load base module");
         }
 #else
         Dl_info info;
-        if (!dladdr((void*)(uintptr_t)&jl_load_dynamic_library, &info) || !info.dli_fname)
+        if (!dladdr((void *)(uintptr_t)&jl_load_dynamic_library, &info) || !info.dli_fname)
             jl_error("could not load base module");
         handle = dlopen(info.dli_fname, RTLD_NOW);
 #endif
@@ -175,7 +175,8 @@ JL_DLLEXPORT void *jl_load_dynamic_library(const char *modname, unsigned flags, 
             and also skip for absolute paths
     */
     if (!abspath && jl_base_module != NULL) {
-        jl_array_t *DL_LOAD_PATH = (jl_array_t*)jl_get_global(jl_base_module, jl_symbol("DL_LOAD_PATH"));
+        jl_array_t *DL_LOAD_PATH =
+            (jl_array_t *)jl_get_global(jl_base_module, jl_symbol("DL_LOAD_PATH"));
         if (DL_LOAD_PATH != NULL) {
             size_t j;
             for (j = 0; j < jl_array_len(DL_LOAD_PATH); j++) {
@@ -186,12 +187,14 @@ JL_DLLEXPORT void *jl_load_dynamic_library(const char *modname, unsigned flags, 
                 for (i = 0; i < n_extensions; i++) {
                     const char *ext = extensions[i];
                     path[0] = '\0';
-                    if (dl_path[len-1] == PATHSEPSTRING[0])
+                    if (dl_path[len - 1] == PATHSEPSTRING[0])
                         snprintf(path, PATHBUF, "%s%s%s", dl_path, modname, ext);
                     else
-                        snprintf(path, PATHBUF, "%s" PATHSEPSTRING "%s%s", dl_path, modname, ext);
+                        snprintf(path, PATHBUF, "%s" PATHSEPSTRING "%s%s", dl_path, modname,
+                                 ext);
 #ifdef _OS_WINDOWS_
-                    if (i == 0) { // LoadLibrary already tested the extensions, we just need to check the `stat` result
+                    if (i == 0) { // LoadLibrary already tested the extensions, we just need
+                                  // to check the `stat` result
 #endif
                         handle = jl_dlopen(path, flags);
                         if (handle)
@@ -201,7 +204,7 @@ JL_DLLEXPORT void *jl_load_dynamic_library(const char *modname, unsigned flags, 
                     }
 #endif
                     // bail out and show the error if file actually exists
-                    if (jl_stat(path, (char*)&stbuf) == 0)
+                    if (jl_stat(path, (char *)&stbuf) == 0)
                         goto notfound;
                 }
             }
@@ -238,13 +241,13 @@ done:
     return handle;
 }
 
-JL_DLLEXPORT int jl_dlsym(void *handle, const char *symbol, void ** value, int throw_err)
+JL_DLLEXPORT int jl_dlsym(void *handle, const char *symbol, void **value, int throw_err)
 {
     int symbol_found = 0;
 
     /* First, get the symbol value */
 #ifdef _OS_WINDOWS_
-    *value = GetProcAddress((HMODULE) handle, symbol);
+    *value = GetProcAddress((HMODULE)handle, symbol);
 #else
     dlerror(); /* Reset error status. */
     *value = dlsym(handle, symbol);
@@ -272,10 +275,10 @@ JL_DLLEXPORT int jl_dlsym(void *handle, const char *symbol, void ** value, int t
 }
 
 #ifdef _OS_WINDOWS_
-//Look for symbols in win32 libraries
+// Look for symbols in win32 libraries
 const char *jl_dlfind_win32(const char *f_name)
 {
-    void * dummy;
+    void *dummy;
     if (jl_dlsym(jl_exe_handle, f_name, &dummy, 0))
         return JL_EXE_LIBNAME;
     if (jl_dlsym(jl_dl_handle, f_name, &dummy, 0))

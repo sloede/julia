@@ -1,7 +1,7 @@
 // This file is a part of Julia. License is MIT: https://julialang.org/license
 
-#include <locale.h>
 #include "libsupport.h"
+#include <locale.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,7 +20,7 @@ void libsupport_init(void)
 
         ios_init_stdstreams();
 
-        isInitialized=1;
+        isInitialized = 1;
     }
 }
 

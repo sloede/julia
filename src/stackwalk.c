@@ -4,11 +4,11 @@
   stackwalk.c
   utilities for walking the stack and looking up information about code addresses
 */
-#include <inttypes.h>
 #include "julia.h"
+#include "julia_assert.h"
 #include "julia_internal.h"
 #include "threading.h"
-#include "julia_assert.h"
+#include <inttypes.h>
 
 // define `jl_unw_get` as a macro, since (like setjmp)
 // returning from the callee function will invalidate the context
@@ -17,23 +17,26 @@
 #elif !defined(JL_DISABLE_LIBUNWIND)
 #define jl_unw_get(context) unw_getcontext(context)
 #else
-void jl_unw_get(void *context) {};
+void jl_unw_get(void *context){};
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-static int jl_unw_init(bt_cursor_t *cursor, bt_context_t *context, int lockless) JL_NOTSAFEPOINT;
-static int jl_unw_step(bt_cursor_t *cursor, uintptr_t *ip, uintptr_t *sp, int lockless) JL_NOTSAFEPOINT;
+static int jl_unw_init(bt_cursor_t *cursor, bt_context_t *context,
+                       int lockless) JL_NOTSAFEPOINT;
+static int jl_unw_step(bt_cursor_t *cursor, uintptr_t *ip, uintptr_t *sp,
+                       int lockless) JL_NOTSAFEPOINT;
 
-static jl_gcframe_t *is_enter_interpreter_frame(jl_gcframe_t **ppgcstack, uintptr_t sp) JL_NOTSAFEPOINT
+static jl_gcframe_t *is_enter_interpreter_frame(jl_gcframe_t **ppgcstack,
+                                                uintptr_t sp) JL_NOTSAFEPOINT
 {
     jl_gcframe_t *pgcstack = *ppgcstack;
     while (pgcstack != NULL) {
         jl_gcframe_t *prev = pgcstack->prev;
         if (pgcstack->nroots & 2) { // tagged frame
-            uintptr_t frame_fp = ((uintptr_t*)pgcstack)[-1];
+            uintptr_t frame_fp = ((uintptr_t *)pgcstack)[-1];
             if (frame_fp != 0) { // check that frame was fully initialized
                 if (frame_fp >= sp)
                     break; // stack grows down, so frame pointer is monotonically increasing
@@ -120,13 +123,13 @@ int jl_unw_stepn(bt_cursor_t *cursor, jl_bt_element_t *bt_data, size_t *bt_size,
             // * The way that libunwind handles it in `unw_get_proc_name`:
             //   https://lists.nongnu.org/archive/html/libunwind-devel/2014-06/msg00025.html
             uintptr_t call_ip = return_ip;
-            // ARM instruction pointer encoding uses the low bit as a flag for
-            // thumb mode, which must be cleared before further use. (Note not
-            // needed for ARM AArch64.) See
-            // https://github.com/libunwind/libunwind/pull/131
-            #ifdef _CPU_ARM_
+// ARM instruction pointer encoding uses the low bit as a flag for
+// thumb mode, which must be cleared before further use. (Note not
+// needed for ARM AArch64.) See
+// https://github.com/libunwind/libunwind/pull/131
+#ifdef _CPU_ARM_
             call_ip &= ~(uintptr_t)0x1;
-            #endif
+#endif
             // Now there's two main cases to adjust for:
             // * Normal stack frames where compilers emit a `call` instruction
             //   which we can get from the return address via `call_ip = return_ip - 1`.
@@ -143,7 +146,8 @@ int jl_unw_stepn(bt_cursor_t *cursor, jl_bt_element_t *bt_data, size_t *bt_size,
             jl_bt_element_t *bt_entry = bt_data + n;
             jl_gcframe_t *pgcstack;
             if ((pgcstack = is_enter_interpreter_frame(ppgcstack, thesp))) {
-                size_t add = jl_capture_interp_frame(bt_entry, (void*)((char*)pgcstack - sizeof(void*)), maxsize - n);
+                size_t add = jl_capture_interp_frame(
+                    bt_entry, (void *)((char *)pgcstack - sizeof(void *)), maxsize - n);
                 n += add;
                 bt_entry += add;
                 while ((pgcstack = is_enter_interpreter_frame(ppgcstack, thesp))) {
@@ -167,7 +171,8 @@ int jl_unw_stepn(bt_cursor_t *cursor, jl_bt_element_t *bt_data, size_t *bt_size,
         // Back off one frame since it is likely invalid.
         // This seems to be good enough on x86 to make the LLVM debug info
         // reader happy.
-        if (n > 0) n -= 1;
+        if (n > 0)
+            n -= 1;
     }
     ptls->safe_restore = old_buf;
 #endif
@@ -179,7 +184,8 @@ int jl_unw_stepn(bt_cursor_t *cursor, jl_bt_element_t *bt_data, size_t *bt_size,
 }
 
 NOINLINE size_t rec_backtrace_ctx(jl_bt_element_t *bt_data, size_t maxsize,
-                                  bt_context_t *context, jl_gcframe_t *pgcstack, int lockless) JL_NOTSAFEPOINT
+                                  bt_context_t *context, jl_gcframe_t *pgcstack,
+                                  int lockless) JL_NOTSAFEPOINT
 {
     bt_cursor_t cursor;
     if (!jl_unw_init(&cursor, context, lockless))
@@ -224,7 +230,8 @@ JL_DLLEXPORT jl_value_t *jl_backtrace_from_here(int returnsp, int skip)
     jl_array_t *bt2 = NULL;
     JL_GC_PUSH3(&ip, &sp, &bt2);
     if (array_ptr_void_type == NULL) {
-        array_ptr_void_type = jl_apply_type2((jl_value_t*)jl_array_type, (jl_value_t*)jl_voidpointer_type, jl_box_long(1));
+        array_ptr_void_type = jl_apply_type2(
+            (jl_value_t *)jl_array_type, (jl_value_t *)jl_voidpointer_type, jl_box_long(1));
     }
     ip = jl_alloc_array_1d(array_ptr_void_type, 0);
     sp = returnsp ? jl_alloc_array_1d(array_ptr_void_type, 0) : NULL;
@@ -244,12 +251,13 @@ JL_DLLEXPORT jl_value_t *jl_backtrace_from_here(int returnsp, int skip)
             jl_array_grow_end(ip, maxincr);
             uintptr_t *sp_ptr = NULL;
             if (returnsp) {
-                sp_ptr = (uintptr_t*)jl_array_data(sp) + offset;
+                sp_ptr = (uintptr_t *)jl_array_data(sp) + offset;
                 jl_array_grow_end(sp, maxincr);
             }
             size_t size_incr = 0;
-            have_more_frames = jl_unw_stepn(&cursor, (jl_bt_element_t*)jl_array_data(ip) + offset,
-                                            &size_incr, sp_ptr, maxincr, skip, &pgcstack, 0, 0);
+            have_more_frames =
+                jl_unw_stepn(&cursor, (jl_bt_element_t *)jl_array_data(ip) + offset,
+                             &size_incr, sp_ptr, maxincr, skip, &pgcstack, 0, 0);
             skip = 0;
             offset += size_incr;
         }
@@ -258,7 +266,7 @@ JL_DLLEXPORT jl_value_t *jl_backtrace_from_here(int returnsp, int skip)
             jl_array_del_end(sp, jl_array_len(sp) - offset);
 
         size_t n = 0;
-        jl_bt_element_t *bt_data = (jl_bt_element_t*)jl_array_data(ip);
+        jl_bt_element_t *bt_data = (jl_bt_element_t *)jl_array_data(ip);
         while (n < jl_array_len(ip)) {
             jl_bt_element_t *bt_entry = bt_data + n;
             if (!jl_bt_is_native(bt_entry)) {
@@ -272,7 +280,8 @@ JL_DLLEXPORT jl_value_t *jl_backtrace_from_here(int returnsp, int skip)
             n += jl_bt_entry_size(bt_entry);
         }
     }
-    jl_value_t *bt = returnsp ? (jl_value_t*)jl_svec(3, ip, bt2, sp) : (jl_value_t*)jl_svec(2, ip, bt2);
+    jl_value_t *bt = returnsp ? (jl_value_t *)jl_svec(3, ip, bt2, sp) :
+                                (jl_value_t *)jl_svec(2, ip, bt2);
     JL_GC_POP();
     return bt;
 }
@@ -283,16 +292,17 @@ void decode_backtrace(jl_bt_element_t *bt_data, size_t bt_size,
 {
     jl_array_t *bt, *bt2;
     if (array_ptr_void_type == NULL) {
-        array_ptr_void_type = jl_apply_type2((jl_value_t*)jl_array_type, (jl_value_t*)jl_voidpointer_type, jl_box_long(1));
+        array_ptr_void_type = jl_apply_type2(
+            (jl_value_t *)jl_array_type, (jl_value_t *)jl_voidpointer_type, jl_box_long(1));
     }
     bt = *btout = jl_alloc_array_1d(array_ptr_void_type, bt_size);
-    static_assert(sizeof(jl_bt_element_t) == sizeof(void*),
+    static_assert(sizeof(jl_bt_element_t) == sizeof(void *),
                   "jl_bt_element_t is presented as Ptr{Cvoid} on julia side");
     memcpy(bt->data, bt_data, bt_size * sizeof(jl_bt_element_t));
     bt2 = *bt2out = jl_alloc_array_1d(jl_array_any_type, 0);
     // Scan the backtrace buffer for any gc-managed values
     for (size_t i = 0; i < bt_size; i += jl_bt_entry_size(bt_data + i)) {
-        jl_bt_element_t* bt_entry = bt_data + i;
+        jl_bt_element_t *bt_entry = bt_data + i;
         if (jl_bt_is_native(bt_entry))
             continue;
         size_t njlvals = jl_bt_num_jlvals(bt_entry);
@@ -318,19 +328,19 @@ JL_DLLEXPORT jl_value_t *jl_get_backtrace(void)
     decode_backtrace(bt_data, bt_size, &bt, &bt2);
     jl_svec_t *pair = jl_svec2(bt, bt2);
     JL_GC_POP();
-    return (jl_value_t*)pair;
+    return (jl_value_t *)pair;
 }
 
 // Return data from the exception stack for `task` as an array of Any, starting
 // with the top of the stack and returning up to `max_entries`. If requested by
 // setting the `include_bt` flag, backtrace data in bt,bt2 format is
 // interleaved.
-JL_DLLEXPORT jl_value_t *jl_get_excstack(jl_task_t* task, int include_bt, int max_entries)
+JL_DLLEXPORT jl_value_t *jl_get_excstack(jl_task_t *task, int include_bt, int max_entries)
 {
-    JL_TYPECHK(catch_stack, task, (jl_value_t*)task);
+    JL_TYPECHK(catch_stack, task, (jl_value_t *)task);
     jl_ptls_t ptls = jl_get_ptls_states();
-    if (task != ptls->current_task &&
-        task->state != failed_sym && task->state != done_sym) {
+    if (task != ptls->current_task && task->state != failed_sym &&
+        task->state != done_sym) {
         jl_error("Inspecting the exception stack of a task which might "
                  "be running concurrently isn't allowed.");
     }
@@ -346,16 +356,15 @@ JL_DLLEXPORT jl_value_t *jl_get_excstack(jl_task_t* task, int include_bt, int ma
         jl_array_ptr_1d_push(stack, jl_excstack_exception(excstack, itr));
         if (include_bt) {
             decode_backtrace(jl_excstack_bt_data(excstack, itr),
-                             jl_excstack_bt_size(excstack, itr),
-                             &bt, &bt2);
-            jl_array_ptr_1d_push(stack, (jl_value_t*)bt);
-            jl_array_ptr_1d_push(stack, (jl_value_t*)bt2);
+                             jl_excstack_bt_size(excstack, itr), &bt, &bt2);
+            jl_array_ptr_1d_push(stack, (jl_value_t *)bt);
+            jl_array_ptr_1d_push(stack, (jl_value_t *)bt2);
         }
         itr = jl_excstack_next(excstack, itr);
         i++;
     }
     JL_GC_POP();
-    return (jl_value_t*)stack;
+    return (jl_value_t *)stack;
 }
 
 #if defined(_OS_WINDOWS_)
@@ -367,15 +376,15 @@ static struct {
     DWORD64 ImageBase;
 } HistoryTable;
 #endif
-static PVOID CALLBACK JuliaFunctionTableAccess64(
-        _In_  HANDLE hProcess,
-        _In_  DWORD64 AddrBase)
+static PVOID CALLBACK JuliaFunctionTableAccess64(_In_ HANDLE hProcess,
+                                                 _In_ DWORD64 AddrBase)
 {
-    //jl_printf(JL_STDOUT, "lookup %d\n", AddrBase);
+    // jl_printf(JL_STDOUT, "lookup %d\n", AddrBase);
 #ifdef _CPU_X86_64_
     DWORD64 ImageBase;
     PRUNTIME_FUNCTION fn = RtlLookupFunctionEntry(AddrBase, &ImageBase, &HistoryTable);
-    if (fn) return fn;
+    if (fn)
+        return fn;
     if (jl_in_stackwalk) {
         return 0;
     }
@@ -387,15 +396,14 @@ static PVOID CALLBACK JuliaFunctionTableAccess64(
     return SymFunctionTableAccess64(hProcess, AddrBase);
 #endif
 }
-static DWORD64 WINAPI JuliaGetModuleBase64(
-        _In_  HANDLE hProcess,
-        _In_  DWORD64 dwAddr)
+static DWORD64 WINAPI JuliaGetModuleBase64(_In_ HANDLE hProcess, _In_ DWORD64 dwAddr)
 {
-    //jl_printf(JL_STDOUT, "lookup base %d\n", dwAddr);
+    // jl_printf(JL_STDOUT, "lookup base %d\n", dwAddr);
 #ifdef _CPU_X86_64_
     DWORD64 ImageBase;
     PRUNTIME_FUNCTION fn = RtlLookupFunctionEntry(dwAddr, &ImageBase, &HistoryTable);
-    if (fn) return ImageBase;
+    if (fn)
+        return ImageBase;
     if (jl_in_stackwalk) {
         return 0;
     }
@@ -404,7 +412,8 @@ static DWORD64 WINAPI JuliaGetModuleBase64(
     jl_in_stackwalk = 0;
     return fbase;
 #else
-    if (dwAddr == HistoryTable.dwAddr) return HistoryTable.ImageBase;
+    if (dwAddr == HistoryTable.dwAddr)
+        return HistoryTable.ImageBase;
     DWORD64 ImageBase = jl_getUnwindInfo(dwAddr);
     if (ImageBase) {
         HistoryTable.dwAddr = dwAddr;
@@ -415,15 +424,14 @@ static DWORD64 WINAPI JuliaGetModuleBase64(
 #endif
 }
 
-static DWORD64 WINAPI JuliaAsyncGetModuleBase64(
-        _In_  HANDLE hProcess,
-        _In_  DWORD64 dwAddr)
+static DWORD64 WINAPI JuliaAsyncGetModuleBase64(_In_ HANDLE hProcess, _In_ DWORD64 dwAddr)
 {
-    //jl_printf(JL_STDOUT, "lookup base %d\n", dwAddr);
+    // jl_printf(JL_STDOUT, "lookup base %d\n", dwAddr);
 #ifdef _CPU_X86_64_
     return JuliaGetModuleBase64(hProcess, dwAddr);
 #else
-    if (dwAddr == HistoryTable.dwAddr) return HistoryTable.ImageBase;
+    if (dwAddr == HistoryTable.dwAddr)
+        return HistoryTable.ImageBase;
     DWORD64 ImageBase = jl_trygetUnwindInfo(dwAddr);
     if (ImageBase) {
         HistoryTable.dwAddr = dwAddr;
@@ -436,7 +444,7 @@ static DWORD64 WINAPI JuliaAsyncGetModuleBase64(
 
 // Might be called from unmanaged thread.
 int needsSymRefreshModuleList;
-BOOL (WINAPI *hSymRefreshModuleList)(HANDLE);
+BOOL(WINAPI *hSymRefreshModuleList)(HANDLE);
 void jl_refresh_dbg_module_list(void)
 {
     if (needsSymRefreshModuleList && hSymRefreshModuleList != 0 && !jl_in_stackwalk) {
@@ -462,9 +470,10 @@ static int jl_unw_init(bt_cursor_t *cursor, bt_context_t *Context, int lockless)
     cursor->stackframe.AddrStack.Mode = AddrModeFlat;
     cursor->stackframe.AddrFrame.Mode = AddrModeFlat;
     cursor->context = *Context;
-    BOOL result = StackWalk64(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), hMainThread,
-        &cursor->stackframe, &cursor->context, NULL, JuliaFunctionTableAccess64,
-            lockless ? JuliaAsyncGetModuleBase64 : JuliaGetModuleBase64, NULL);
+    BOOL result =
+        StackWalk64(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), hMainThread,
+                    &cursor->stackframe, &cursor->context, NULL, JuliaFunctionTableAccess64,
+                    lockless ? JuliaAsyncGetModuleBase64 : JuliaGetModuleBase64, NULL);
     jl_in_stackwalk = 0;
     return result;
 #else
@@ -481,16 +490,17 @@ static int readable_pointer(LPCVOID pointer)
     if (VirtualQuery(pointer, &mInfo, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
         return 0;
     DWORD X = mInfo.AllocationProtect;
-    if (!((X&PAGE_READONLY) || (X&PAGE_READWRITE) || (X&PAGE_WRITECOPY) || (X&PAGE_EXECUTE_READ)) ||
-          (X&PAGE_GUARD) || (X&PAGE_NOACCESS))
+    if (!((X & PAGE_READONLY) || (X & PAGE_READWRITE) || (X & PAGE_WRITECOPY) ||
+          (X & PAGE_EXECUTE_READ)) ||
+        (X & PAGE_GUARD) || (X & PAGE_NOACCESS))
         return 0;
     return 1;
 }
 
 static int jl_unw_step(bt_cursor_t *cursor, uintptr_t *ip, uintptr_t *sp, int lockless)
 {
-    DWORD64 WINAPI (*GetModuleBase64)(HANDLE, DWORD64) = lockless ?
-        JuliaAsyncGetModuleBase64 : JuliaGetModuleBase64;
+    DWORD64 WINAPI (*GetModuleBase64)(HANDLE, DWORD64) =
+        lockless ? JuliaAsyncGetModuleBase64 : JuliaGetModuleBase64;
     // Might be called from unmanaged thread.
 #ifndef _CPU_X86_64_
     *ip = (uintptr_t)cursor->stackframe.AddrPC.Offset;
@@ -498,13 +508,14 @@ static int jl_unw_step(bt_cursor_t *cursor, uintptr_t *ip, uintptr_t *sp, int lo
     if (*ip == 0) {
         if (!readable_pointer((LPCVOID)*sp))
             return 0;
-        cursor->stackframe.AddrPC.Offset = *(DWORD32*)*sp;      // POP EIP (aka RET)
-        cursor->stackframe.AddrStack.Offset += sizeof(void*);
+        cursor->stackframe.AddrPC.Offset = *(DWORD32 *)*sp; // POP EIP (aka RET)
+        cursor->stackframe.AddrStack.Offset += sizeof(void *);
         return cursor->stackframe.AddrPC.Offset != 0;
     }
 
     BOOL result = StackWalk64(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), hMainThread,
-        &cursor->stackframe, &cursor->context, NULL, JuliaFunctionTableAccess64, GetModuleBase64, NULL);
+                              &cursor->stackframe, &cursor->context, NULL,
+                              JuliaFunctionTableAccess64, GetModuleBase64, NULL);
     return result;
 #else
     *ip = (uintptr_t)cursor->Rip;
@@ -512,8 +523,8 @@ static int jl_unw_step(bt_cursor_t *cursor, uintptr_t *ip, uintptr_t *sp, int lo
     if (*ip == 0) {
         if (!readable_pointer((LPCVOID)*sp))
             return 0;
-        cursor->Rip = *(DWORD64*)*sp;      // POP RIP (aka RET)
-        cursor->Rsp += sizeof(void*);
+        cursor->Rip = *(DWORD64 *)*sp; // POP RIP (aka RET)
+        cursor->Rsp += sizeof(void *);
         return cursor->Rip != 0;
     }
 
@@ -521,29 +532,23 @@ static int jl_unw_step(bt_cursor_t *cursor, uintptr_t *ip, uintptr_t *sp, int lo
     if (!ImageBase)
         return 0;
 
-    PRUNTIME_FUNCTION FunctionEntry = (PRUNTIME_FUNCTION)JuliaFunctionTableAccess64(
-        GetCurrentProcess(), cursor->Rip);
+    PRUNTIME_FUNCTION FunctionEntry =
+        (PRUNTIME_FUNCTION)JuliaFunctionTableAccess64(GetCurrentProcess(), cursor->Rip);
     if (!FunctionEntry) { // assume this is a NO_FPO RBP-based function
-        cursor->Rsp = cursor->Rbp;                 // MOV RSP, RBP
+        cursor->Rsp = cursor->Rbp; // MOV RSP, RBP
         if (!readable_pointer((LPCVOID)cursor->Rsp))
             return 0;
-        cursor->Rbp = *(DWORD64*)cursor->Rsp;      // POP RBP
-        cursor->Rsp += sizeof(void*);
-        cursor->Rip = *(DWORD64*)cursor->Rsp;      // POP RIP (aka RET)
-        cursor->Rsp += sizeof(void*);
+        cursor->Rbp = *(DWORD64 *)cursor->Rsp; // POP RBP
+        cursor->Rsp += sizeof(void *);
+        cursor->Rip = *(DWORD64 *)cursor->Rsp; // POP RIP (aka RET)
+        cursor->Rsp += sizeof(void *);
     }
     else {
         PVOID HandlerData;
         DWORD64 EstablisherFrame;
-        (void)RtlVirtualUnwind(
-                0 /*UNW_FLAG_NHANDLER*/,
-                ImageBase,
-                cursor->Rip,
-                FunctionEntry,
-                cursor,
-                &HandlerData,
-                &EstablisherFrame,
-                NULL);
+        (void)RtlVirtualUnwind(0 /*UNW_FLAG_NHANDLER*/, ImageBase, cursor->Rip,
+                               FunctionEntry, cursor, &HandlerData, &EstablisherFrame,
+                               NULL);
     }
     return cursor->Rip != 0;
 #endif
@@ -602,11 +607,11 @@ JL_DLLEXPORT jl_value_t *jl_lookup_code_address(void *ip, int skipC)
     int8_t gc_state = jl_gc_safe_enter(ptls);
     int n = jl_getFunctionInfo(&frames, (uintptr_t)ip, skipC, 0);
     jl_gc_safe_leave(ptls, gc_state);
-    jl_value_t *rs = (jl_value_t*)jl_alloc_svec(n);
+    jl_value_t *rs = (jl_value_t *)jl_alloc_svec(n);
     JL_GC_PUSH1(&rs);
     for (int i = 0; i < n; i++) {
         jl_frame_t frame = frames[i];
-        jl_value_t *r = (jl_value_t*)jl_alloc_svec(6);
+        jl_value_t *r = (jl_value_t *)jl_alloc_svec(6);
         jl_svecset(rs, i, r);
         if (frame.func_name)
             jl_svecset(r, 0, jl_symbol(frame.func_name));
@@ -619,7 +624,7 @@ JL_DLLEXPORT jl_value_t *jl_lookup_code_address(void *ip, int skipC)
             jl_svecset(r, 1, empty_sym);
         free(frame.file_name);
         jl_svecset(r, 2, jl_box_long(frame.line));
-        jl_svecset(r, 3, frame.linfo != NULL ? (jl_value_t*)frame.linfo : jl_nothing);
+        jl_svecset(r, 3, frame.linfo != NULL ? (jl_value_t *)frame.linfo : jl_nothing);
         jl_svecset(r, 4, jl_box_bool(frame.fromC));
         jl_svecset(r, 5, jl_box_bool(frame.inlined));
     }
@@ -628,8 +633,8 @@ JL_DLLEXPORT jl_value_t *jl_lookup_code_address(void *ip, int skipC)
     return rs;
 }
 
-void jl_safe_print_codeloc(const char* func_name, const char* file_name,
-                           int line, int inlined) JL_NOTSAFEPOINT
+void jl_safe_print_codeloc(const char *func_name, const char *file_name, int line,
+                           int inlined) JL_NOTSAFEPOINT
 {
     const char *inlined_str = inlined ? " [inlined]" : "";
     if (line != -1) {
@@ -655,10 +660,11 @@ void jl_print_native_codeloc(uintptr_t ip) JL_NOTSAFEPOINT
     for (i = 0; i < n; i++) {
         jl_frame_t frame = frames[i];
         if (!frame.func_name) {
-            jl_safe_printf("unknown function (ip: %p)\n", (void*)ip);
+            jl_safe_printf("unknown function (ip: %p)\n", (void *)ip);
         }
         else {
-            jl_safe_print_codeloc(frame.func_name, frame.file_name, frame.line, frame.inlined);
+            jl_safe_print_codeloc(frame.func_name, frame.file_name, frame.line,
+                                  frame.inlined);
             free(frame.func_name);
             free(frame.file_name);
         }
@@ -677,25 +683,25 @@ void jl_print_bt_entry_codeloc(jl_bt_element_t *bt_entry) JL_NOTSAFEPOINT
         jl_value_t *code = jl_bt_entry_jlvalue(bt_entry, 0);
         if (jl_is_method_instance(code)) {
             // When interpreting a method instance, need to unwrap to find the code info
-            code = ((jl_method_instance_t*)code)->uninferred;
+            code = ((jl_method_instance_t *)code)->uninferred;
         }
         if (jl_is_code_info(code)) {
-            jl_code_info_t *src = (jl_code_info_t*)code;
+            jl_code_info_t *src = (jl_code_info_t *)code;
             // See also the debug info handling in codegen.cpp.
             // NB: debuginfoloc is 1-based!
-            intptr_t debuginfoloc = ((int32_t*)jl_array_data(src->codelocs))[ip];
+            intptr_t debuginfoloc = ((int32_t *)jl_array_data(src->codelocs))[ip];
             while (debuginfoloc != 0) {
-                jl_line_info_node_t *locinfo = (jl_line_info_node_t*)
-                    jl_array_ptr_ref(src->linetable, debuginfoloc - 1);
+                jl_line_info_node_t *locinfo = (jl_line_info_node_t *)jl_array_ptr_ref(
+                    src->linetable, debuginfoloc - 1);
                 assert(jl_typeis(locinfo, jl_lineinfonode_type));
                 jl_value_t *method = locinfo->method;
                 if (jl_is_method_instance(method)) {
-                    method = ((jl_method_instance_t*)method)->def.value;
+                    method = ((jl_method_instance_t *)method)->def.value;
                     if (jl_is_method(method))
-                        method = (jl_value_t*)((jl_method_t*)method)->name;
+                        method = (jl_value_t *)((jl_method_t *)method)->name;
                 }
-                const char *func_name = jl_is_symbol(method) ?
-                                        jl_symbol_name((jl_sym_t*)method) : "Unknown";
+                const char *func_name =
+                    jl_is_symbol(method) ? jl_symbol_name((jl_sym_t *)method) : "Unknown";
                 jl_safe_print_codeloc(func_name, jl_symbol_name(locinfo->file),
                                       locinfo->line, locinfo->inlined_at);
                 debuginfoloc = locinfo->inlined_at;
@@ -715,7 +721,7 @@ void jl_print_bt_entry_codeloc(jl_bt_element_t *bt_entry) JL_NOTSAFEPOINT
 
 //--------------------------------------------------
 // Tools for interactive debugging in gdb
-JL_DLLEXPORT void jl_gdblookup(void* ip)
+JL_DLLEXPORT void jl_gdblookup(void *ip)
 {
     jl_print_native_codeloc((uintptr_t)ip);
 }
