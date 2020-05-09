@@ -1310,7 +1310,7 @@ function cholesky!(F::Factor{Tv}, A::Sparse{Tv};
 end
 
 """
-    cholesky!(F::Factor, A; shift = 0.0, check = true) -> CHOLMOD.Factor
+    cholesky!(F::Factor, A::SparseMatrixCSC; shift = 0.0, check = true) -> CHOLMOD.Factor
 
 Compute the Cholesky (``LL'``) factorization of `A`, reusing the symbolic
 factorization `F`. `A` must be a [`SparseMatrixCSC`](@ref) or a [`Symmetric`](@ref)/

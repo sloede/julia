@@ -14,8 +14,8 @@ SuiteSparse.CHOLMOD.lowrankupdate!
 SuiteSparse.CHOLMOD.lowrankdowndate
 SuiteSparse.CHOLMOD.lowrankdowndate!
 SuiteSparse.CHOLMOD.lowrankupdowndate!
-SuiteSparse.SPQR.lu
-SuiteSparse.SPQR.lu!
+SuiteSparse.UMFPACK.lu
+SuiteSparse.UMFPACK.lu!
 SuiteSparse.SPQR.qr
 ```
 
