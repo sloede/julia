@@ -330,3 +330,13 @@ end
 @inline (::Type{SSC})(a::AbstractVector) where {SSC <: SHermitianCompact} = SSC((a...,))
 x = SHermitianCompact{1,Float32,3}([1.0f0, 2.0f0, 3.0f0])
 @test_broken worlds(mi) == w
+
+## A case in which there is no intersection between signatures
+## A possibly relevant point is that the invalidated instance comes from
+##    convert(::Type{T}, x) where {T>:Nothing} = convert(nonnothingtype_checked(T), x)
+## and that >: is relatively unusual among method signatures.
+abstract type Colorant end
+mi = instance(convert, (Type{Nothing}, String))
+w = worlds(mi)
+Base.convert(::Type{C}, c) where C<:Colorant = false
+@test_broken worlds(mi) == w
