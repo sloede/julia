@@ -199,3 +199,134 @@ end
 notify(c26506_1)
 wait(c26506_2)
 @test result26506[1] == 3
+
+
+## Invalidation tests
+
+function instance(f, types)
+    m = which(f, types)
+    inst = nothing
+    tt = Tuple{typeof(f), types...}
+    specs = m.specializations
+    if isa(specs, Nothing)
+    elseif isa(specs, Core.SimpleVector)
+        for i = 1:length(specs)
+            if isassigned(specs, i)
+                mi = specs[i]::Core.MethodInstance
+                if mi.specTypes === tt
+                    inst = mi
+                    break
+                end
+            end
+        end
+    else
+        Base.visit(specs) do mi
+            if mi.specTypes === tt
+                inst = mi
+            end
+        end
+    end
+    return inst
+end
+
+function worlds(mi::Core.MethodInstance)
+    w = Tuple{UInt,UInt}[]
+    if isdefined(mi, :cache)
+        ci = mi.cache
+        push!(w, (ci.min_world, ci.max_world))
+        while isdefined(ci, :next)
+            ci = ci.next
+            push!(w, (ci.min_world, ci.max_world))
+        end
+    end
+    return w
+end
+
+# avoid adding this to Base
+function equal(ci1::Core.CodeInfo, ci2::Core.CodeInfo)
+    return ci1.code == ci2.code &&
+           ci1.codelocs == ci2.codelocs &&
+           ci1.ssavaluetypes == ci2.ssavaluetypes &&
+           ci1.ssaflags == ci2.ssaflags &&
+           ci1.method_for_inference_limit_heuristics == ci2.method_for_inference_limit_heuristics &&
+           ci1.linetable == ci2.linetable &&
+           ci1.slotnames == ci2.slotnames &&
+           ci1.slotflags == ci2.slotflags &&
+           ci1.slottypes == ci2.slottypes &&
+           ci1.rettype == ci2.rettype
+end
+equal(p1::Pair, p2::Pair) = p1.second == p2.second && equal(p1.first, p2.first)
+
+## Union-splitting based on state-of-the-world: check that each invalidation corresponds to new code
+applyf(c) = f(c[1])
+f(::Int) = 1
+f(::Float64) = 2
+applyf([1])
+applyf([1.0])
+applyf(Any[1])
+wint   = worlds(instance(applyf, (Vector{Int},)))
+wfloat = worlds(instance(applyf, (Vector{Float64},)))
+wany2  = worlds(instance(applyf, (Vector{Any},)))
+src2 = code_typed(applyf, (Vector{Any},))[1]
+f(::String) = 3
+applyf(Any[1])
+@test worlds(instance(applyf, (Vector{Int},))) == wint
+@test worlds(instance(applyf, (Vector{Float64},))) == wfloat
+wany3 = worlds(instance(applyf, (Vector{Any},)))
+src3 = code_typed(applyf, (Vector{Any},))[1]
+@test (wany3 == wany2) == equal(src3, src2)   # don't invalidate unless you also change the code
+f(::Vector{Int}) = 4
+applyf(Any[1])
+wany4 = worlds(instance(applyf, (Vector{Any},)))
+src4 = code_typed(applyf, (Vector{Any},))[1]
+@test (wany4 == wany3) == equal(src4, src3)
+f(::Dict) = 5
+applyf(Any[1])
+wany5 = worlds(instance(applyf, (Vector{Any},)))
+src5 = code_typed(applyf, (Vector{Any},))[1]
+@test (wany5 == wany4) == equal(src5, src4)
+f(::Set) = 6    # with current settings, this shouldn't invalidate
+applyf(Any[1])
+wany6 = worlds(instance(applyf, (Vector{Any},)))
+src6 = code_typed(applyf, (Vector{Any},))[1]
+@test (wany6 == wany5) == equal(src6, src5)
+
+## ambiguities do not trigger invalidation
+using Printf
+Printf.gen("%f")
+mi = instance(+, (AbstractChar, UInt8))
+w = worlds(mi)
+
+abstract type FixedPoint{T <: Integer} <: Real end
+struct Normed <: FixedPoint{UInt8}
+    i::UInt8
+    Normed(i::Integer, _) = new(i % UInt8)
+end
+(::Type{X})(x::Real) where X<:FixedPoint{T} where T = X(round(T, typemax(T)*x), 0)
+
+@test_broken worlds(mi) == w
+
+## specialization heuristics do not trigger false invalidation
+## Here, the new method is not actually reachable, but partial specialization makes the MethodInstance
+## specTypes make it look like it might be.
+s = Set([VERSION])
+mv = maximum(s)
+mi = instance(maximum, (typeof(s),))
+w = worlds(mi)
+Base.reduce_empty(::typeof(Base.add_sum), ::Type{F}) where {F<:FixedPoint}  = 0.0
+@test sum(Normed[]) === 0.0
+@test_broken worlds(mi) == w
+
+## Check that invalidations don't happen for mi.specTypes <: method.sig
+## In this case the MethodInstance being invalidated is for Union{}(::Array{_A,1} where _A)
+createdict(@nospecialize(d::Dict{K,V} where {K,V})) = typeof(d)()
+d = createdict(Dict("a"=>1))
+mi = instance(createdict, (Dict{K,V} where {K,V},))
+w = worlds(mi)
+struct SHermitianCompact{N,T,L}
+    data::NTuple{L,T}
+    SHermitianCompact{N,T,L}(data::NTuple{L,T}) where {N,T,L} = new{N,T,L}(data)
+end
+@inline (::Type{SSC})(a::AbstractVector) where {SSC <: SHermitianCompact} = SSC((a...,))
+x = SHermitianCompact{1,Float32,3}([1.0f0, 2.0f0, 3.0f0])
+@test_broken worlds(mi) == w
