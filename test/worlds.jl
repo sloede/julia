@@ -275,11 +275,11 @@ applyf(Any[1])
 wany3 = worlds(instance(applyf, (Vector{Any},)))
 src3 = code_typed(applyf, (Vector{Any},))[1]
 @test (wany3 == wany2) == equal(src3, src2)   # don't invalidate unless you also change the code
-f(::Vector{Int}) = 4
+f(::AbstractVector) = 4         # next test would pass if this were ::Vector{Int}
 applyf(Any[1])
 wany4 = worlds(instance(applyf, (Vector{Any},)))
 src4 = code_typed(applyf, (Vector{Any},))[1]
-@test (wany4 == wany3) == equal(src4, src3)
+@test_broken (wany4 == wany3) == equal(src4, src3)
 f(::Dict) = 5
 applyf(Any[1])
 wany5 = worlds(instance(applyf, (Vector{Any},)))
