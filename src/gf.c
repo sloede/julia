@@ -1682,18 +1682,41 @@ JL_DLLEXPORT void jl_method_table_disable(jl_methtable_t *mt, jl_method_t *metho
     JL_UNLOCK(&mt->writelock);
 }
 
+static int jl_is_call_ambiguous(jl_value_t *types, jl_method_t *m)
+{
+    if (m->ambig == jl_nothing)
+        return 0;
+    for (size_t i = 0; i < jl_array_len(m->ambig); i++) {
+        jl_typemap_entry_t *mambig = (jl_typemap_entry_t*)jl_array_ptr_ref(m->ambig, i);
+        if (mambig->min_world <= jl_world_counter && jl_world_counter <= mambig->max_world)
+            if (jl_subtype((jl_value_t*)types, (jl_value_t*)mambig->sig))
+                return 1;
+    }
+    return 0;
+}
+
+static int jl_is_function_call_ambiguous(jl_value_t *types JL_PROPAGATES_ROOT, size_t world)
+{
+    jl_methtable_t *mt = jl_first_argument_datatype(types)->name->mt;
+    struct jl_typemap_assoc search = {types, world, NULL, 0, ~(size_t)0};
+    jl_typemap_entry_t *entry = jl_typemap_assoc_by_type(mt->defs, &search, 0, 1);
+    if (!entry)
+        return 0;
+    return jl_is_call_ambiguous(types, entry->func.method);
+}
+
 JL_DLLEXPORT void jl_method_table_insert(jl_methtable_t *mt, jl_method_t *method, jl_tupletype_t *simpletype)
 {
     JL_TIMING(ADD_METHOD);
     assert(jl_is_method(method));
     assert(jl_is_mtable(mt));
     jl_value_t *type = method->sig;
-    jl_value_t *oldvalue = NULL;
+    jl_value_t *oldvalue = NULL, *isect = NULL;
     if (method->primary_world == 1)
         method->primary_world = ++jl_world_counter;
     size_t max_world = method->primary_world - 1;
     int invalidated = 0;
-    JL_GC_PUSH1(&oldvalue);
+    JL_GC_PUSH2(&oldvalue, &isect);
     JL_LOCK(&mt->writelock);
     // first delete the existing entry (we'll disable it later)
     struct jl_typemap_assoc search = {(jl_value_t*)type, method->primary_world, NULL, 0, ~(size_t)0};
@@ -1718,7 +1741,8 @@ JL_DLLEXPORT void jl_method_table_insert(jl_methtable_t *mt, jl_method_t *method
             size_t ins = 0;
             for (i = 1; i < na; i += 2) {
                 jl_value_t *backedgetyp = backedges[i - 1];
-                if (!jl_has_empty_intersection(backedgetyp, (jl_value_t*)type)) {
+                isect = jl_type_intersection(backedgetyp, (jl_value_t*)type);
+                if (isect != jl_bottom_type && !jl_is_function_call_ambiguous(isect, max_world)) {
                     jl_method_instance_t *backedge = (jl_method_instance_t*)backedges[i];
                     invalidate_method_instance(backedge, max_world, 0);
                     invalidated = 1;
@@ -1766,9 +1790,12 @@ JL_DLLEXPORT void jl_method_table_insert(jl_methtable_t *mt, jl_method_t *method
             size_t i, l = jl_svec_len(specializations);
             for (i = 0; i < l; i++) {
                 jl_method_instance_t *mi = (jl_method_instance_t*)jl_svecref(specializations, i);
-                if (mi != NULL && !jl_has_empty_intersection(type, (jl_value_t*)mi->specTypes))
-                    if (invalidate_backedges(mi, max_world))
-                        invalidated = 1;
+                if (mi != NULL) {
+                    isect = jl_type_intersection(type, (jl_value_t*)mi->specTypes);
+                    if (isect != jl_bottom_type && !jl_is_function_call_ambiguous(isect, max_world))
+                        if (invalidate_backedges(mi, max_world))
+                            invalidated = 1;
+                }
             }
         }
     }
